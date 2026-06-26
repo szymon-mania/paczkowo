@@ -1,0 +1,127 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+
+const orders = [
+  { id: "ALG-10293", buyer: "Anna Kowalska", channel: "Allegro", total: "129,00 zł", status: "Nowe", date: "26.06" },
+  { id: "ERL-55012", buyer: "Piotr Nowak", channel: "Erli", total: "59,99 zł", status: "Do spakowania", date: "26.06" },
+  { id: "ALG-10288", buyer: "Maria Wiśniewska", channel: "Allegro", total: "248,50 zł", status: "Do spakowania", date: "26.06" },
+  { id: "ALG-10277", buyer: "Tomasz Lewandowski", channel: "Allegro", total: "32,00 zł", status: "Wysłane", date: "25.06" },
+  { id: "ERL-54998", buyer: "Katarzyna Zielińska", channel: "Erli", total: "189,00 zł", status: "Wysłane", date: "25.06" },
+  { id: "ALG-10260", buyer: "Marek Wójcik", channel: "Allegro", total: "74,90 zł", status: "Anulowane", date: "24.06" },
+];
+
+const statusStyles: Record<string, string> = {
+  "Nowe": "bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300",
+  "Do spakowania": "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+  "Wysłane": "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+  "Anulowane": "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+};
+
+const filters = ["Wszystkie", "Nowe", "Do spakowania", "Wysłane", "Anulowane"];
+---
+
+<AppShell title="Zamówienia — Paczkowo" active="orders">
+  <div class="mx-auto max-w-6xl space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-white">
+          Zamówienia
+        </h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          Widok demonstracyjny — przykładowe dane z połączonych kanałów.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          class="h-5 w-5"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m-6 0h6m-6 0H5.625c-.621 0-1.125-.504-1.125-1.125V6.375c0-.621.504-1.125 1.125-1.125h12.75c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125H15"
+          ></path>
+        </svg>
+        Drukuj etykiety
+      </button>
+    </div>
+
+    <!-- Filtry -->
+    <div class="flex flex-wrap gap-2">
+      {
+        filters.map((f, i) => (
+          <button
+            type="button"
+            class={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+              i === 0
+                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                : "border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            }`}
+          >
+            {f}
+          </button>
+        ))
+      }
+    </div>
+
+    <!-- Tabela -->
+    <div
+      class="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead
+            class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400"
+          >
+            <tr>
+              <th class="px-6 py-3 font-medium">Numer</th>
+              <th class="px-6 py-3 font-medium">Kupujący</th>
+              <th class="px-6 py-3 font-medium">Kanał</th>
+              <th class="px-6 py-3 font-medium">Kwota</th>
+              <th class="px-6 py-3 font-medium">Status</th>
+              <th class="px-6 py-3 font-medium">Data</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+            {
+              orders.map((o) => (
+                <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <td class="whitespace-nowrap px-6 py-4 font-medium text-slate-900 dark:text-white">
+                    {o.id}
+                  </td>
+                  <td class="px-6 py-4 text-slate-700 dark:text-slate-300">
+                    {o.buyer}
+                  </td>
+                  <td class="px-6 py-4 text-slate-600 dark:text-slate-400">
+                    {o.channel}
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-4 text-slate-700 dark:text-slate-300">
+                    {o.total}
+                  </td>
+                  <td class="px-6 py-4">
+                    <span
+                      class={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[o.status]}`}
+                    >
+                      {o.status}
+                    </span>
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-4 text-slate-500 dark:text-slate-400">
+                    {o.date}
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</AppShell>

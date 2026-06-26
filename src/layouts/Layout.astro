@@ -1,0 +1,64 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Pokaż globalny nagłówek i stopkę (domyślnie true). Wyłączane np. w panelu/logowaniu. */
+  chrome?: boolean;
+}
+
+const {
+  title = "Paczkowo — zarządzanie zamówieniami Allegro i Erli",
+  description =
+    "Paczkowo to desktopowe narzędzie (Tauri) do obsługi zamówień z Allegro i Erli, automatycznych etykiet InPost oraz zarządzania magazynem z wielu kont w jednym miejscu.",
+  chrome = true,
+} = Astro.props;
+
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+---
+
+<!doctype html>
+<html lang="pl" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#1c6df5" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="pl_PL" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Ustawienie motywu przed renderem, aby uniknąć migotania (FOUC). -->
+    <script is:inline>
+      (function () {
+        try {
+          const stored = localStorage.getItem("theme");
+          const prefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)"
+          ).matches;
+          if (stored === "dark" || (!stored && prefersDark)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    {chrome && <Header />}
+    <slot />
+    {chrome && <Footer />}
+  </body>
+</html>

@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Dark mode sterowany klasą `.dark` na elemencie <html> (przełącznik + localStorage). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #eef7ff;
+  --color-brand-100: #d9edff;
+  --color-brand-200: #bce0ff;
+  --color-brand-300: #8eccff;
+  --color-brand-400: #59afff;
+  --color-brand-500: #338dff;
+  --color-brand-600: #1c6df5;
+  --color-brand-700: #1557e1;
+  --color-brand-800: #1847b6;
+  --color-brand-900: #19408f;
+  --color-brand-950: #142857;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-white text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200;
+}
+
+/* Pomocniczy gradientowy tekst dla nagłówków. */
+.text-gradient {
+  @apply bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent dark:from-brand-300 dark:to-brand-500;
+}

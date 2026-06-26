@@ -1,0 +1,84 @@
+---
+import Logo from "./Logo.astro";
+
+const year = new Date().getFullYear();
+
+const columns = [
+  {
+    title: "Produkt",
+    links: [
+      { href: "/#funkcje", label: "Funkcje" },
+      { href: "/#jak-to-dziala", label: "Jak to działa" },
+      { href: "/#cennik", label: "Cennik" },
+      { href: "/#pobierz", label: "Pobierz aplikację" },
+    ],
+  },
+  {
+    title: "Zasoby",
+    links: [
+      { href: "/#faq", label: "FAQ" },
+      { href: "/allegro-api-info", label: "Integracja z Allegro API" },
+      { href: "/login", label: "Logowanie" },
+    ],
+  },
+  {
+    title: "Firma",
+    links: [
+      { href: "/#kontakt", label: "Kontakt" },
+      { href: "mailto:kontakt@paczkowo.net", label: "kontakt@paczkowo.net" },
+    ],
+  },
+];
+---
+
+<footer
+  class="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"
+>
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div class="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
+      <div class="lg:col-span-2">
+        <Logo />
+        <p class="mt-4 max-w-xs text-sm text-slate-600 dark:text-slate-400">
+          Desktopowy system do zarządzania zamówieniami i wysyłkami dla
+          sprzedawców Allegro i Erli. Etykiety InPost, magazyn i wiele kont w
+          jednym miejscu.
+        </p>
+      </div>
+
+      {
+        columns.map((col) => (
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
+              {col.title}
+            </h3>
+            <ul class="mt-4 space-y-3">
+              {col.links.map((link) => (
+                <li>
+                  <a
+                    href={link.href}
+                    class="text-sm text-slate-600 transition hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <div
+      class="mt-10 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-6 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:flex-row"
+    >
+      <p>© {year} Paczkowo. Wszelkie prawa zastrzeżone.</p>
+      <p>
+        Made in Poland 🇵🇱 ·
+        <a
+          href="https://paczkowo.net"
+          class="hover:text-brand-600 dark:hover:text-brand-400">paczkowo.net</a
+        >
+      </p>
+    </div>
+  </div>
+</footer>

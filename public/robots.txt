@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://paczkowo.net/sitemap-index.xml

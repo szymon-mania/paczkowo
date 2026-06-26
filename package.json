@@ -1,0 +1,28 @@
+{
+  "name": "paczkowo-web",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Strona marketingowa Paczkowo — OMS dla sprzedawców Allegro/Erli z integracją InPost.",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/react": "^4.2.1",
+    "@astrojs/sitemap": "^3.2.1",
+    "@tailwindcss/vite": "^4.0.6",
+    "astro": "^5.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,85 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const scope = [
+  "pobieranie zamówień z Allegro",
+  "synchronizacja statusów zamówień",
+  "aktualizacja stanów magazynowych",
+  "obsługa danych ofertowych",
+  "integracja z procesem wysyłki",
+];
+---
+
+<Layout
+  title="Paczkowo OMS — informacja o integracji z Allegro API"
+  description="Informacja o zakresie i celu integracji systemu Paczkowo OMS z Allegro REST API."
+>
+  <main class="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+    <article class="prose-paczkowo">
+      <p
+        class="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 dark:border-brand-900/60 dark:bg-brand-950/40 dark:text-brand-300"
+      >
+        Integracja z Allegro API
+      </p>
+
+      <h1
+        class="mt-6 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl dark:text-white"
+      >
+        Paczkowo OMS — informacja o integracji z Allegro API
+      </h1>
+
+      <p class="mt-6 text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+        Paczkowo OMS to system do obsługi sprzedaży internetowej, który integruje
+        się z Allegro REST API w celu synchronizacji zamówień, ofert, stanów
+        magazynowych oraz danych wysyłkowych.
+      </p>
+
+      <p class="mt-4 text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+        Aplikacja wykorzystuje Allegro API wyłącznie w celu obsługi kont
+        sprzedawców, którzy połączyli swoje konto Allegro z systemem Paczkowo OMS.
+      </p>
+
+      <h2
+        class="mt-10 text-xl font-semibold text-slate-900 dark:text-white"
+      >
+        Zakres działania integracji:
+      </h2>
+      <ul class="mt-4 space-y-2">
+        {
+          scope.map((item) => (
+            <li class="flex items-start gap-3 text-slate-700 dark:text-slate-300">
+              <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+              {item}
+            </li>
+          ))
+        }
+      </ul>
+
+      <div
+        class="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-900"
+      >
+        <h2 class="text-base font-semibold text-slate-900 dark:text-white">
+          Kontakt techniczny:
+        </h2>
+        <p class="mt-2">
+          <a
+            href="mailto:szymonmania24@gmail.com"
+            class="font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >szymonmania24@gmail.com</a
+          >
+        </p>
+
+        <h2 class="mt-6 text-base font-semibold text-slate-900 dark:text-white">
+          Strona projektu:
+        </h2>
+        <p class="mt-2">
+          <a
+            href="https://paczkowo.net"
+            class="font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >https://paczkowo.net</a
+          >
+        </p>
+      </div>
+    </article>
+  </main>
+</Layout>
