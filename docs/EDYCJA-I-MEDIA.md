@@ -4,8 +4,8 @@
 
 - Teksty strony głównej: `src/pages/index.astro`.
 - Strona pobierania Windows: `src/pages/pobierz.astro`.
-- Stały adres pobierania: `src/config/downloads.ts`. Nie zmieniaj go na adres
-  z numerem wydania - ma pozostać `https://api.paczkowo.net/downloads/latest/windows-x64`.
+- Adres manifestu aktualizacji: `src/config/downloads.ts`. Strona pobiera z niego
+  aktualny adres instalatora, więc nie wpisuj na stronie nazwy pliku z wersją.
 - Kolory i typografia: `src/styles/global.css`.
 
 Po zmianie uruchom `npm run dev`; przeglądarka odświeży podgląd automatycznie.

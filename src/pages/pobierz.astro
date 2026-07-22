@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { downloads } from "../config/downloads";
+import WindowsDownloadButton from "../components/WindowsDownloadButton.tsx";
 ---
 
 <Layout
@@ -22,15 +22,7 @@ import { downloads } from "../config/downloads";
           pobieranie, aby od razu dostać aktualny instalator dla Windows.
         </p>
 
-        <a
-          href={downloads.windowsX64}
-          class="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-lg bg-brand-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:w-auto"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4.5-4.5M12 15 7.5 10.5M4 20.25h16" />
-          </svg>
-          Pobierz dla Windows
-        </a>
+        <WindowsDownloadButton client:load />
 
         <ul class="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-600 dark:text-slate-300">
           <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>Windows 10 i 11</li>
