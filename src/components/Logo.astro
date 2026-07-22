@@ -1,38 +1,9 @@
 ---
-interface Props {
-  class?: string;
-}
+interface Props { class?: string; }
 const { class: className = "" } = Astro.props;
 ---
 
-<a
-  href="/"
-  class={`inline-flex items-center gap-2 font-semibold tracking-tight ${className}`}
-  aria-label="Paczkowo — strona główna"
->
-  <span
-    class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white shadow-sm"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      class="h-5 w-5"
-      aria-hidden="true"
-    >
-      <path
-        d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7z"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linejoin="round"
-        fill="currentColor"
-        fill-opacity="0.15"></path>
-      <path
-        d="M3.5 7 12 11.5 20.5 7M12 11.5v10"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linejoin="round"></path>
-    </svg>
-  </span>
-  <span class="text-lg text-slate-900 dark:text-white">Paczkowo</span>
+<a href="/" class={`inline-flex items-center gap-2.5 font-semibold tracking-tight ${className}`} aria-label="Paczkowo — strona główna">
+  <img src="/brand/paczkowo-logo.png" alt="" class="h-9 w-9" width="36" height="36" />
+  <span class="text-lg text-white">Paczkowo</span>
 </a>

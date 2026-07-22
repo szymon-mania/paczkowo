@@ -4,8 +4,8 @@
 
 - Teksty strony głównej: `src/pages/index.astro`.
 - Strona pobierania Windows: `src/pages/pobierz.astro`.
-- Adres manifestu aktualizacji: `src/config/downloads.ts`. Strona pobiera z niego
-  aktualny adres instalatora, więc nie wpisuj na stronie nazwy pliku z wersją.
+- Stały adres pobierania: `src/config/downloads.ts`. Nie zmieniaj go na adres
+  z numerem wydania - ma pozostać `https://api.paczkowo.net/downloads/latest/windows-x64`.
 - Kolory i typografia: `src/styles/global.css`.
 
 Po zmianie uruchom `npm run dev`; przeglądarka odświeży podgląd automatycznie.
@@ -37,6 +37,22 @@ Przykład osadzenia:
 ```
 
 Pliki wgrywaj do `public/media/`; będą dostępne pod adresem `/media/nazwa-pliku`.
+
+## DaVinci Resolve: szybki workflow
+
+1. Nagraj ekran aplikacji w rozdzielczości 1920x1080, ale pokazuj jedną czynność: np. utworzenie etykiety albo filtrowanie zamówień.
+2. W DaVinci ustaw krótkie ujęcie, najlepiej 6-12 sekund, 24 lub 30 FPS. Usuń długie przejścia i dźwięk.
+3. Wyeksportuj plik MP4 H.264, 1080p, z rozsądnym bitrate. Zostaw pierwszy kadr czytelny, bo posłuży jako plakat.
+4. Wygeneruj plakat WebP z pierwszego kadru: `public/media/nazwa.webp`.
+5. Dla jeszcze mniejszej wagi przygotuj WebM VP9 z MP4 za pomocą ffmpeg:
+
+```powershell
+ffmpeg -i public/media/nazwa.mp4 -c:v libvpx-vp9 -crf 33 -b:v 0 -an public/media/nazwa.webm
+```
+
+6. Wstaw oba pliki według przykładu z poprzedniej sekcji. Strona najpierw wybierze WebM, a MP4 zostanie zapasowym formatem.
+
+Nie eksportuj prezentacji aplikacji jako GIF. Ten sam materiał będzie wielokrotnie cięższy, bez jakości potrzebnej do czytania interfejsu.
 
 ## Wizualna edycja
 

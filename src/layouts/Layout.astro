@@ -22,7 +22,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
 ---
 
 <!doctype html>
-<html lang="pl" class="scroll-smooth">
+<html lang="pl" class="scroll-smooth dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -31,7 +31,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta name="theme-color" content="#1c6df5" />
+    <meta name="theme-color" content="#0b0b12" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -46,17 +46,12 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
       (function () {
         try {
           const stored = localStorage.getItem("theme");
-          const prefersDark = window.matchMedia(
-            "(prefers-color-scheme: dark)"
-          ).matches;
-          if (stored === "dark" || (!stored && prefersDark)) {
-            document.documentElement.classList.add("dark");
-          }
+          document.documentElement.classList.toggle("dark", stored !== "light");
         } catch (e) {}
       })();
     </script>
   </head>
-  <body>
+  <body class="site-shell min-h-screen">
     {chrome && <Header />}
     <slot />
     {chrome && <Footer />}

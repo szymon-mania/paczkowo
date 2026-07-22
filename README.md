@@ -18,12 +18,17 @@ Strona jest w pełni statyczna (SSG) — **bez backendu i bez bazy danych**.
 
 | Ścieżka              | Opis                                                            |
 | -------------------- | -------------------------------------------------------------- |
-| `/`                  | Landing page (hero, jak to działa, funkcje, cennik, FAQ, kontakt) |
+| `/`                  | Strona główna Paczkowo                                      |
+| `/funkcje`           | Funkcje aplikacji OMS                                       |
+| `/integracje`        | Integracje Allegro, Erli i InPost                           |
+| `/cennik`            | Plany i cennik                                               |
 | `/login`             | Ekran logowania (UI)                                            |
 | `/dashboard`         | Pulpit (UI demonstracyjne)                                      |
 | `/orders`            | Lista zamówień (UI demonstracyjne)                             |
 | `/pobierz`           | Pobranie najnowszej wersji Paczkowo dla Windows                |
 | `/allegro-api-info`  | Strona informacyjna o integracji z Allegro API                 |
+| `/warunki-korzystania` | Warunki korzystania                                         |
+| `/polityka-prywatnosci` | Polityka prywatności                                       |
 
 ## Wymagania
 

@@ -1,0 +1,18 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const integrations = [
+  { image: "/brand/allegro.png", name: "Allegro", type: "Marketplace", text: "Zamówienia, oferty, statusy oraz proces wysyłki z oficjalnym API Allegro." },
+  { image: "/brand/erli.png", name: "Erli", type: "Marketplace", text: "Obsługa zamówień i ofert Erli bez przełączania się między panelami." },
+  { image: "/brand/inpost.png", name: "InPost", type: "Wysyłka", text: "Tworzenie przesyłek i etykiet dla Paczkomatów oraz kuriera." },
+];
+---
+
+<Layout title="Integracje Paczkowo" description="Integracje Paczkowo z Allegro, Erli i InPost.">
+  <main>
+    <section class="border-b border-white/10"><div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24"><p class="eyebrow">Integracje</p><h1 class="mt-5 max-w-3xl text-5xl font-bold leading-tight text-white sm:text-6xl">Twoje kanały sprzedaży, jedna operacyjna przestrzeń.</h1><p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">Połącz konta, nadawaj przesyłki i pracuj na aktualnych danych bez ręcznego przepisywania informacji.</p></div></section>
+    <section class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24"><div class="grid gap-px border border-white/10 bg-white/10 lg:grid-cols-3">{integrations.map((integration) => <article class="bg-[#101019] p-8"><div class="flex h-14 items-center"><img src={integration.image} alt={integration.name} class="max-h-10 max-w-32 object-contain object-left" /></div><p class="mt-10 text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">{integration.type}</p><h2 class="mt-3 text-2xl font-semibold text-white">{integration.name}</h2><p class="mt-4 text-sm leading-7 text-slate-400">{integration.text}</p></article>)}</div></section>
+    <section class="border-y border-white/10 bg-[#101019]"><div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 lg:px-8"><div><p class="eyebrow">Bezpieczeństwo połączeń</p><h2 class="mt-4 text-3xl font-bold text-white">Łączysz tylko te konta, które wybierzesz.</h2></div><div class="text-sm leading-7 text-slate-400">Paczkowo korzysta z mechanizmów autoryzacji dostawców integracji. Uprawnienia możesz zarządzać z poziomu aplikacji, a szczegóły integracji Allegro znajdują się na dedykowanej stronie informacyjnej.</div></div></section>
+    <section class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8"><a href="/allegro-api-info" class="inline-flex border border-white/15 px-5 py-3 text-sm font-semibold text-white hover:border-brand-300 hover:text-brand-200">Informacja o integracji z Allegro API →</a></section>
+  </main>
+</Layout>

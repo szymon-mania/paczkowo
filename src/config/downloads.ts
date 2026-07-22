@@ -1,3 +1,3 @@
 export const downloads = {
-  updateManifest: "https://api.paczkowo.net/update/manifest",
+  latestWindowsX64: "https://api.paczkowo.net/downloads/latest/windows-x64",
 } as const;

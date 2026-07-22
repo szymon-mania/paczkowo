@@ -4,17 +4,17 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-brand-50: #eef7ff;
-  --color-brand-100: #d9edff;
-  --color-brand-200: #bce0ff;
-  --color-brand-300: #8eccff;
-  --color-brand-400: #59afff;
-  --color-brand-500: #338dff;
-  --color-brand-600: #1c6df5;
-  --color-brand-700: #1557e1;
-  --color-brand-800: #1847b6;
-  --color-brand-900: #19408f;
-  --color-brand-950: #142857;
+  --color-brand-50: #f5f0ff;
+  --color-brand-100: #ebe0ff;
+  --color-brand-200: #d5bdff;
+  --color-brand-300: #b890ff;
+  --color-brand-400: #9a67ff;
+  --color-brand-500: #8245f5;
+  --color-brand-600: #7133d8;
+  --color-brand-700: #5b27b0;
+  --color-brand-800: #472084;
+  --color-brand-900: #341963;
+  --color-brand-950: #21123f;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
@@ -25,11 +25,21 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-body {
-  @apply bg-white text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200;
-}
+body { @apply bg-[#0b0b12] text-slate-100 antialiased; }
 
 /* Pomocniczy gradientowy tekst dla nagłówków. */
 .text-gradient {
-  @apply bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent dark:from-brand-300 dark:to-brand-500;
+  @apply text-brand-300;
 }
+
+::selection { background: #7133d8; color: white; }
+
+.site-shell {
+  background-color: #0b0b12;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.eyebrow { @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-300; }
+.eyebrow::before { content: ""; @apply h-2 w-2 bg-brand-400; }
+.surface-line { @apply border border-white/10 bg-[#13131d]; }
