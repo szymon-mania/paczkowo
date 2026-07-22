@@ -1,0 +1,8 @@
+---
+import InteractiveDemo from "../components/InteractiveDemo";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Demo aplikacji Paczkowo" description="Interaktywne demo Paczkowo z przykładowymi danymi." chrome={false}>
+  <InteractiveDemo client:only="react" />
+</Layout>

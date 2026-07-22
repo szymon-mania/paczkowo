@@ -1,0 +1,132 @@
+/* Dopasowanie react-phone-number-input do stylu pozostałych pól aplikacji. */
+.pp-phone {
+  margin-top: 4px;
+}
+.pp-phone .PhoneInput {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+/* Lewy box: flaga + kierunkowy */
+.pp-phone .PhoneInputCountry {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.pp-phone-country-button {
+  width: 64px;
+  height: 100%;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.pp-phone-country-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.pp-phone-country-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 220;
+  width: min(520px, calc(100vw - 48px));
+  max-height: 320px;
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 16px 42px rgb(15 23 42 / 22%);
+}
+.pp-phone-country-search {
+  position: sticky;
+  top: -5px;
+  z-index: 1;
+  padding: 5px 5px 7px;
+  margin: -5px -5px 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.pp-phone-country-search input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px var(--font-body);
+  box-sizing: border-box;
+}
+.pp-phone-country-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.pp-phone-country-option {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 28px 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.pp-phone-country-option:hover,
+.pp-phone-country-option.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.pp-phone-country-option .PhoneInputCountryIcon {
+  width: 24px;
+}
+.pp-phone-country-option-code {
+  color: var(--text);
+  font-weight: 600;
+}
+.pp-phone-country-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-phone-country-empty {
+  padding: 14px 10px;
+  color: var(--muted);
+  font: 13px var(--font-body);
+  text-align: center;
+}
+/* Prawy box: numer */
+.pp-phone .PhoneInputInput {
+  flex: 1;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--text);
+}
+.pp-phone .PhoneInputInput:focus,
+.pp-phone .PhoneInputCountry:focus-within {
+  outline: none;
+  border-color: var(--accent);
+}
+.pp-phone .PhoneInputCountrySelectArrow {
+  color: var(--muted2);
+}

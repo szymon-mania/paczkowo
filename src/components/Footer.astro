@@ -2,8 +2,8 @@
 import Logo from "./Logo.astro";
 const year = new Date().getFullYear();
 const columns = [
-  { title: "Produkt", links: [{ href: "/funkcje", label: "Funkcje" }, { href: "/integracje", label: "Integracje" }, { href: "/cennik", label: "Cennik" }, { href: "/pobierz", label: "Pobierz dla Windows" }] },
-  { title: "Pomoc", links: [{ href: "/allegro-api-info", label: "Integracja z Allegro API" }, { href: "mailto:kontakt@paczkowo.net", label: "Kontakt" }] },
+  { title: "Produkt", links: [{ href: "/demo", label: "Demo aplikacji" }, { href: "/funkcje", label: "Funkcje" }, { href: "/integracje", label: "Integracje" }, { href: "/cennik", label: "Cennik" }, { href: "/pobierz", label: "Pobierz dla Windows" }] },
+  { title: "Pomoc", links: [{ href: "/kontakt", label: "Pomoc i kontakt" }, { href: "/allegro-api-info", label: "Integracja z Allegro API" }] },
   { title: "Dokumenty", links: [{ href: "/warunki-korzystania", label: "Warunki korzystania" }, { href: "/polityka-prywatnosci", label: "Polityka prywatności" }] },
 ];
 ---
@@ -19,7 +19,7 @@ const columns = [
     </div>
     <div class="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
       <p>© {year} Paczkowo. Wszelkie prawa zastrzeżone.</p>
-      <a href="mailto:kontakt@paczkowo.net" class="transition hover:text-white">kontakt@paczkowo.net</a>
+      <a href="/kontakt" class="transition hover:text-white">Pomoc i kontakt</a>
     </div>
   </div>
 </footer>

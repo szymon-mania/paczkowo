@@ -1,57 +1,60 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import ProductPreview from "../components/ProductPreview.astro";
 
 const features = [
-  { number: "01", title: "Jedna kolejka zamówień", text: "Allegro, Erli i własne procesy w jednym spokojnym widoku." },
-  { number: "02", title: "Wysyłka bez przełączania kart", text: "Twórz etykiety, drukuj i przekazuj numery śledzenia bez ręcznego kopiowania." },
-  { number: "03", title: "Magazyn pod kontrolą", text: "Pilnuj stanów, rezerwacji i dostępności ofert tam, gdzie faktycznie pracujesz." },
-  { number: "04", title: "Wiele kont, jeden rytm pracy", text: "Oddziel konta sprzedażowe, ale nie dziel zespołu na kilka paneli." },
+  { number: "01", title: "Wspólna kolejka", text: "Wszystkie zamówienia w jednym widoku." },
+  { number: "02", title: "Szybsza wysyłka", text: "Etykiety i statusy bez ręcznego przepisywania." },
+  { number: "03", title: "Magazyn pod ręką", text: "Stany i produkty tam, gdzie obsługujesz sprzedaż." },
 ];
 
 const workflow = [
-  ["Połącz", "Dodaj konto Allegro, Erli i usługi kurierskie."],
-  ["Obsłuż", "Sortuj zamówienia według tego, co wymaga działania teraz."],
-  ["Nadaj", "Drukuj etykiety i zamykaj wysyłkę z jednego miejsca."],
+  ["Połącz", "Dodaj konta sprzedażowe."],
+  ["Obsłuż", "Wybierz zamówienia do działania."],
+  ["Nadaj", "Przygotuj paczki i wyślij."],
 ];
 ---
 
-<Layout title="Paczkowo — OMS dla sprzedaży internetowej" description="Paczkowo porządkuje zamówienia, wysyłki i magazyn sprzedawców Allegro oraz Erli.">
+<Layout title="Paczkowo - OMS dla e-commerce" description="Paczkowo łączy zamówienia, wysyłkę i magazyn w jednym miejscu.">
   <main>
     <section class="border-b border-white/10">
-      <div class="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:px-8 lg:py-24">
+      <div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-8 lg:py-24">
         <div>
-          <p class="eyebrow">System OMS dla e-commerce</p>
-          <h1 class="mt-5 max-w-xl text-5xl font-bold leading-[1.02] text-white sm:text-6xl">Sprzedaż bez chaosu w zakładkach.</h1>
-          <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">Wszystko, czego potrzebujesz do codziennej obsługi sprzedaży. Bez miliona ustawień. Bez wysokiego abonamentu.</p>
+          <p class="eyebrow">Paczkowo dla e-commerce</p>
+          <h1 class="mt-5 max-w-xl text-5xl font-bold leading-[1.02] text-white sm:text-6xl">Zamówienia, wysyłka i magazyn. Razem.</h1>
+          <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">Mniej klików w panelach. Więcej paczek wysłanych na czas.</p>
           <div class="mt-9 flex flex-col gap-3 sm:flex-row">
-            <a href="/pobierz" class="inline-flex items-center justify-center gap-2 bg-brand-500 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-brand-400">Pobierz dla Windows <span aria-hidden="true">↓</span></a>
-            <a href="/funkcje" class="inline-flex items-center justify-center border border-white/15 px-5 py-3.5 text-sm font-semibold text-white transition hover:border-white/35 hover:bg-white/5">Zobacz funkcje</a>
+            <a href="/demo" class="inline-flex items-center justify-center gap-2 bg-brand-500 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-brand-400">Otwórz demo <span aria-hidden="true">→</span></a>
+            <a href="/pobierz" class="inline-flex items-center justify-center border border-white/15 px-5 py-3.5 text-sm font-semibold text-white transition hover:border-white/35 hover:bg-white/5">Pobierz dla Windows</a>
           </div>
-          <div class="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-400"><span>Obsługiwane integracje:</span><img src="/brand/allegro.png" alt="Allegro" class="h-5 w-auto object-contain" /><img src="/brand/erli.png" alt="Erli" class="h-5 w-auto object-contain" /><img src="/brand/inpost.png" alt="InPost" class="h-6 w-auto object-contain" /></div>
+          <div class="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-400"><span>Integracje:</span><img src="/brand/allegro.png" alt="Allegro" class="h-5 w-auto object-contain" /><img src="/brand/erli.png" alt="Erli" class="h-5 w-auto object-contain" /><img src="/brand/inpost.png" alt="InPost" class="h-6 w-auto object-contain" /></div>
         </div>
-        <ProductPreview />
+        <a href="/demo" class="group border border-white/10 bg-[#12121d] p-6 transition hover:border-brand-300 sm:p-8" aria-label="Otwórz interaktywne demo Paczkowo">
+          <div class="flex items-center justify-between border-b border-white/10 pb-5"><span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Interaktywne demo</span><span class="text-sm text-slate-500">Dane przykładowe</span></div>
+          <h2 class="mt-12 max-w-md text-4xl font-bold leading-tight text-white">Zobacz aplikację, zanim ją pobierzesz.</h2>
+          <p class="mt-5 max-w-md text-sm leading-7 text-slate-400">Klikaj, dodaj konto Allegro i obsłuż 10 przykładowych zamówień. Bez logowania i bez połączenia z Twoimi danymi.</p>
+          <span class="mt-12 inline-flex bg-white px-5 py-3 text-sm font-semibold text-brand-800 transition group-hover:bg-brand-50">Uruchom demo →</span>
+        </a>
       </div>
     </section>
 
     <section class="border-b border-white/10 bg-[#101019]">
       <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div class="max-w-2xl"><p class="eyebrow">Praca w swoim tempie</p><h2 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Każdy etap wysyłki ma swoje miejsce.</h2></div>
+        <div class="max-w-2xl"><p class="eyebrow">Prosty proces</p><h2 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Od zamówienia do nadania.</h2></div>
         <div class="mt-12 grid border-y border-white/10 md:grid-cols-3">
-          {workflow.map(([title, text], index) => <div class:list={["py-7 md:px-8", index > 0 ? "md:border-l md:border-white/10" : ""]}><span class="text-sm font-semibold text-brand-300">0{index + 1}</span><h3 class="mt-6 text-xl font-semibold text-white">{title}</h3><p class="mt-3 max-w-xs text-sm leading-6 text-slate-400">{text}</p></div>)}
+          {workflow.map(([title, text], index) => <div class:list={["py-7 md:px-8", index > 0 ? "md:border-l md:border-white/10" : ""]}><span class="text-sm font-semibold text-brand-300">0{index + 1}</span><h3 class="mt-6 text-xl font-semibold text-white">{title}</h3><p class="mt-3 text-sm leading-6 text-slate-400">{text}</p></div>)}
         </div>
       </div>
     </section>
 
     <section class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-      <div class="flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><p class="eyebrow">Funkcje, które zostają z Tobą</p><h2 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Mniej ręcznej pracy. Więcej kontroli.</h2></div><a href="/funkcje" class="text-sm font-semibold text-brand-300 transition hover:text-white">Pełna lista funkcji →</a></div>
-      <div class="mt-12 grid gap-px border border-white/10 bg-white/10 md:grid-cols-2">
-        {features.map((feature) => <article class="bg-[#0f0f18] p-7"><span class="text-sm font-semibold text-brand-300">{feature.number}</span><h3 class="mt-8 text-xl font-semibold text-white">{feature.title}</h3><p class="mt-3 max-w-sm text-sm leading-6 text-slate-400">{feature.text}</p></article>)}
+      <div class="flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><p class="eyebrow">Najważniejsze</p><h2 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Mniej ręcznej pracy.</h2></div><a href="/funkcje" class="text-sm font-semibold text-brand-300 transition hover:text-white">Wszystkie funkcje →</a></div>
+      <div class="mt-12 grid gap-px border border-white/10 bg-white/10 md:grid-cols-3">
+        {features.map((feature) => <article class="bg-[#0f0f18] p-7"><span class="text-sm font-semibold text-brand-300">{feature.number}</span><h3 class="mt-8 text-xl font-semibold text-white">{feature.title}</h3><p class="mt-3 text-sm leading-6 text-slate-400">{feature.text}</p></article>)}
       </div>
     </section>
 
     <section class="border-y border-white/10 bg-brand-600">
-      <div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8"><div><p class="text-sm font-semibold text-brand-100">Paczkowo dla Windows</p><h2 class="mt-3 text-3xl font-bold text-white">Pobierz aplikację i zacznij porządkować sprzedaż.</h2></div><a href="/pobierz" class="inline-flex shrink-0 items-center justify-center bg-white px-5 py-3.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50">Pobierz najnowszą wersję</a></div>
+      <div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8"><div><p class="text-sm font-semibold text-brand-100">14 dni za darmo</p><h2 class="mt-3 text-3xl font-bold text-white">Pełna funkcjonalność. Bez ograniczeń.</h2></div><a href="/pobierz" class="inline-flex shrink-0 items-center justify-center bg-white px-5 py-3.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50">Pobierz Paczkowo</a></div>
     </section>
   </main>
 </Layout>

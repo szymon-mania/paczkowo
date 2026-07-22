@@ -1,0 +1,217 @@
+.wh-map-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.wh-layout { display:grid; grid-template-columns:236px minmax(620px,1fr); gap:12px; min-height:720px; }
+.wh-tree,.wh-floor { min-width:0; overflow:hidden; }
+.wh-tree { display:flex; flex-direction:column; }
+.wh-panel-title { padding:13px 14px 9px; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted2); font-weight:750; }
+
+/* ── Budynki jako karty po lewej ─────────────────────────────────────────── */
+.wh-building-cards { padding:2px 8px; display:flex; flex-direction:column; gap:6px; overflow:auto; }
+.wh-building-card { display:flex; align-items:stretch; width:100%; padding:0; border:1px solid var(--border); border-radius:9px; background:var(--surface); cursor:pointer; overflow:hidden; text-align:left; }
+.wh-building-card:hover { border-color:color-mix(in srgb,var(--accent) 40%,var(--border)); }
+.wh-building-card.active { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 7%,var(--surface)); }
+.wh-card-bar { width:6px; flex:none; }
+.wh-card-body { display:flex; flex-direction:column; gap:2px; padding:9px 10px; min-width:0; }
+.wh-card-body strong { font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wh-card-body small { font-size:10px; color:var(--muted2); }
+.wh-card-units { color:var(--text2)!important; font-weight:600; }
+.wh-add-building { display:flex; align-items:center; justify-content:center; gap:6px; margin:8px; padding:9px; border:1px dashed var(--border); border-radius:9px; background:transparent; color:var(--muted2); cursor:pointer; font-size:12px; font-weight:650; }
+.wh-add-building:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.wh-add-building:disabled { opacity:.5; cursor:wait; }
+.wh-unassigned { margin:auto 8px 8px; padding:11px; border:1px dashed color-mix(in srgb,#d88935 55%,var(--border)); border-radius:9px; background:color-mix(in srgb,#d88935 7%,transparent); display:grid; grid-template-columns:1fr auto; gap:2px 8px; font-size:11px; }
+.wh-unassigned div { display:flex; align-items:center; gap:6px; grid-column:1/3; color:#d88935; font-weight:700; }
+.wh-unassigned strong { font-size:17px; }.wh-unassigned small { color:var(--muted2); align-self:end; }
+.wh-grow { flex:1; min-width:0; }
+
+/* ── Środek: nagłówek + pasek dodawania ──────────────────────────────────── */
+.wh-floor { display:flex; flex-direction:column; }
+.wh-editor-head { min-height:57px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--border2); }
+.wh-floor-title { display:flex; align-items:center; gap:8px; min-width:0; }
+.wh-floor-title strong { font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wh-floor-title code { color:var(--accent); font-size:11px; }
+.wh-floor-del { display:grid; place-items:center; width:26px; height:26px; flex:none; border:0; border-radius:7px; background:transparent; color:var(--muted2); cursor:pointer; }
+.wh-floor-del:hover { color:#dc2626; background:color-mix(in srgb,#dc2626 10%,transparent); }
+/* Popup potwierdzenia usunięcia podwórka. */
+.wh-confirm { width:420px; max-width:94vw; padding:24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:0 24px 65px rgba(0,0,0,.3); }
+.wh-confirm-icon { width:52px; height:52px; display:grid; place-items:center; border-radius:50%; color:#dc2626; background:color-mix(in srgb,#dc2626 12%,transparent); }
+.wh-confirm strong { font-size:16px; }
+.wh-confirm p { margin:0; color:var(--muted2); font-size:12.5px; line-height:1.5; }
+.wh-confirm-actions { display:flex; gap:8px; margin-top:8px; }
+.wh-editor-tools { display:flex; align-items:center; gap:8px; flex:none; }
+.wh-heat-toggle { display:inline-flex; align-items:center; gap:5px; min-height:34px; padding:6px 10px; border:1px solid var(--border); border-radius:9px; background:var(--bg); color:var(--muted2); cursor:pointer; font-size:10.5px; font-weight:700; }
+.wh-heat-toggle:hover { color:var(--text); }
+.wh-heat-toggle.active { color:#fff; border-color:transparent; background:linear-gradient(90deg,#2f9e73,#d9a520 55%,#dc2626); }
+/* Przełącznik widoczności stref — akcent zamiast gradientu ciepła. */
+.wh-heat-toggle.wh-zone-toggle.active { background:var(--accent); }
+.wh-editor-mode { display:flex; gap:2px; flex:none; padding:3px; border:1px solid var(--border); border-radius:9px; background:var(--bg); }
+.wh-editor-mode button { display:flex; align-items:center; gap:5px; min-height:28px; padding:5px 9px; border:0; border-radius:6px; background:transparent; color:var(--muted2); cursor:pointer; font-size:10.5px; font-weight:700; }
+.wh-editor-mode button.active { color:var(--accent); background:var(--surface); box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.wh-palette { display:flex; align-items:center; gap:6px; min-height:50px; padding:8px 14px; border-bottom:1px solid var(--border2); overflow-x:auto; }
+.wh-palette button { display:inline-flex; align-items:center; gap:5px; min-height:30px; padding:5px 10px; white-space:nowrap; border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border)); border-radius:8px; background:color-mix(in srgb,var(--accent) 6%,var(--surface)); color:var(--text); cursor:pointer; font-size:10.5px; font-weight:700; }
+.wh-palette button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.wh-palette button:disabled { opacity:.45; cursor:not-allowed; }
+.wh-palette button.active { border-color:var(--accent); color:#fff; background:var(--accent); }
+.wh-palette .wh-palette-custom { margin-left:auto; border-style:dashed; color:var(--muted2); background:transparent; }
+
+/* ── Nieskończone płótno ─────────────────────────────────────────────────── */
+.wh-canvas-shell { position:relative; flex:1; min-height:640px; padding:12px; background:color-mix(in srgb,var(--bg) 42%,var(--surface)); }
+.wh-canvas { position:relative; height:100%; min-height:616px; border-radius:9px; overflow:hidden; border:1px solid var(--border2); touch-action:none; cursor:grab; user-select:none; background:color-mix(in srgb,var(--bg) 82%,var(--surface)); }
+.wh-canvas:active { cursor:grabbing; }
+/* Świat = punkt zakotwiczenia (0×0) — elementy w px świata, mogą leżeć wszędzie. */
+.wh-world { position:absolute; left:0; top:0; width:0; height:0; overflow:visible; transform-origin:0 0; }
+/* Siatka rysowana w przestrzeni EKRANU (nie skalowana!) — zawsze ostre linie 1px.
+   Rozmiar kratki liczy JS z zoomu: przy oddalaniu kratki scalają się w większe. */
+.wh-grid { position:absolute; inset:0; pointer-events:none; background-image:linear-gradient(color-mix(in srgb,var(--text) 7%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--text) 7%,transparent) 1px,transparent 1px); }
+.wh-grid.major { background-image:linear-gradient(color-mix(in srgb,var(--text) 14%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--text) 14%,transparent) 1px,transparent 1px); }
+.wh-canvas-empty { position:absolute; left:16px; top:16px; width:min(520px,80%); padding:14px; color:var(--muted2); font-size:13px; pointer-events:none; }
+
+/* Węzeł = kanciasty, „pikselowaty" prostokąt (ostre rogi, bez cieni). */
+.wh-node { position:absolute; min-width:18px; min-height:14px; border-radius:0; border:2px solid var(--node-color); color:var(--text); cursor:pointer; }
+.wh-node.editable { cursor:move; }
+.wh-node:hover { filter:brightness(1.03); }
+.wh-node.selected { z-index:8!important; border-color:var(--accent)!important; box-shadow:0 0 0 2px var(--accent); }
+/* Regały / palety na wierzchu. */
+.wh-node.wh-element { z-index:3; }
+.wh-node.wh-element.kind-rack { overflow:hidden; }
+/* Pusta strefa: przerywany prostokąt (dopóki nic w niej nie leży). */
+.wh-node.wh-zone-empty { z-index:1; border-style:dashed; background:transparent; }
+/* Regał podzielony na półki — cienkie poziome linie działowe. */
+.wh-shelf-line { position:absolute; left:0; right:0; height:0; border-top:2px solid color-mix(in srgb,var(--node-color) 70%,transparent); pointer-events:none; }
+/* Paleta spiętrowana — „warstwy" widoczne jako przesunięte cienie + plakietka ×N. */
+.wh-node.wh-tiered { box-shadow:4px -4px 0 -1px color-mix(in srgb,var(--node-color) 45%,var(--surface)), 8px -8px 0 -2px color-mix(in srgb,var(--node-color) 30%,var(--surface)); }
+.wh-tier-badge { position:absolute; right:2px; top:2px; z-index:2; padding:1px 5px; background:var(--node-color); color:#fff; font-size:11px; font-weight:800; pointer-events:none; }
+
+/* ── Ściany = łamane / kształty z rogami ─────────────────────────────────── */
+/* Ściany na PIERWSZYM PLANIE (nad elementami i strefami) — nazwa strefy siedzi
+   w jej środku, więc obwódka przy ścianie już niczego nie zasłania. Napisy (z-index 7) zostają nad ścianą. */
+.wh-wall-shape { position:absolute; z-index:6; pointer-events:none; }
+.wh-wall-shape.selected { z-index:20; }
+.wh-wall-line { fill:none; stroke:#3a4250; stroke-linejoin:miter; stroke-linecap:butt; pointer-events:stroke; cursor:move; }
+.wh-wall-shape.selected .wh-wall-line { stroke:color-mix(in srgb,var(--accent) 45%,#3a4250); }
+.wh-wall-line.preview { stroke:var(--accent); opacity:.55; stroke-dasharray:2 3; pointer-events:none; }
+.wh-wall-shape.drawing { pointer-events:none; }
+/* Uchwyty narożników i „+” na środkach odcinków (stała wielkość ekranowa). */
+.wh-wall-vertex { position:absolute; z-index:22; border-radius:50%; border:2px solid var(--accent); background:var(--surface); pointer-events:auto; cursor:grab; }
+.wh-wall-vertex:hover { background:var(--accent); }
+.wh-wall-mid { position:absolute; z-index:21; border-radius:50%; border:1.5px dashed var(--accent); background:color-mix(in srgb,var(--surface) 80%,transparent); pointer-events:auto; cursor:copy; }
+.wh-wall-mid:hover { background:var(--accent); }
+.wh-wall-pt { position:absolute; z-index:23; width:14px; height:14px; border-radius:50%; border:2px solid var(--accent); background:var(--surface); pointer-events:none; }
+.wh-wall-pt.close { background:var(--accent); box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 30%,transparent); }
+/* Etykieta = tylko nazwa, wyśrodkowana, DUŻA. */
+.wh-node-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:3px 5px; overflow:hidden; pointer-events:none; text-align:center; }
+.wh-node-label > strong { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; font-weight:800; letter-spacing:.01em; }
+.wh-resize-handle { position:absolute; right:-5px; bottom:-5px; z-index:9; width:10px; height:10px; cursor:nwse-resize; border-radius:0; border:1.5px solid var(--accent); background:var(--surface); }
+
+/* ── Strefa = obwódka w kolorze strefy (kontur sumy elementów) ───────────── */
+.wh-section-layer { position:absolute; z-index:5; pointer-events:none; }
+.wh-section-outline { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.wh-section-outline line { stroke:currentColor; stroke-width:3.5; vector-effect:non-scaling-stroke; stroke-linecap:square; pointer-events:stroke; cursor:move; }
+.wh-section-layer.selected .wh-section-outline line { stroke-width:5; }
+/* Nazwa strefy na ŚRODKU strefy (nie nad obwódką). */
+.wh-section-tag { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:auto; cursor:move; margin:0; padding:3px 10px; border:0; border-radius:4px; background:color-mix(in srgb,var(--surface) 88%,transparent); font-size:14px; font-weight:800; letter-spacing:.02em; text-transform:uppercase; white-space:nowrap; }
+.wh-section-layer.selected .wh-section-tag { text-decoration:underline; }
+
+/* Napis na planie — sama nazwa, bez ramki. */
+.wh-text { position:absolute; z-index:7; line-height:1.05; font-weight:800; white-space:nowrap; color:var(--text); text-shadow:0 1px 2px rgba(0,0,0,.35); cursor:pointer; }
+.wh-text.editable { cursor:move; }
+.wh-text.selected { outline:2px solid var(--accent); outline-offset:3px; }
+.wh-text .wh-resize-handle { right:-8px; bottom:-8px; }
+
+/* Ramka zaznaczania (rubber band) — w przestrzeni ekranu. */
+.wh-marquee { position:absolute; z-index:14; border:1.5px solid var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); pointer-events:none; }
+
+/* Przyciski ikonowe (cofnij/ponów) w pasku narzędzi. */
+.wh-icon-btn { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--border); border-radius:9px; background:var(--bg); color:var(--text2); cursor:pointer; }
+.wh-icon-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.wh-icon-btn:disabled { opacity:.4; cursor:default; }
+
+/* Tryb rysowania ścian / tekstu. */
+.wh-canvas.wall-tool { cursor:crosshair; }
+.wh-canvas.marquee-tool { cursor:crosshair; }
+.wh-wall-banner { position:absolute; z-index:13; left:12px; top:12px; display:flex; align-items:center; gap:6px; padding:7px 11px; border-radius:0; background:color-mix(in srgb,var(--accent) 92%,#000); color:#fff; font-size:11px; font-weight:650; box-shadow:0 4px 14px rgba(0,0,0,.2); }
+
+.wh-zoom-controls { position:absolute; z-index:12; right:12px; top:12px; display:flex; align-items:center; overflow:hidden; border:1px solid var(--border); border-radius:9px; background:color-mix(in srgb,var(--surface) 94%,transparent); box-shadow:0 4px 14px rgba(0,0,0,.09); }
+.wh-zoom-controls button { width:31px; height:31px; display:grid; place-items:center; border:0; border-right:1px solid var(--border2); background:transparent; color:var(--text2); cursor:pointer; }
+.wh-zoom-controls button:hover { background:var(--bg); color:var(--accent); }
+.wh-zoom-controls span { min-width:49px; text-align:center; color:var(--muted2); font-size:10px; font-weight:700; }
+
+/* ── Pływający panel właściwości (dół-środek edytora) ────────────────────── */
+.wh-context { position:absolute; z-index:16; left:50%; bottom:22px; transform:translateX(-50%); display:flex; align-items:center; gap:7px; max-width:calc(100% - 40px); padding:8px 10px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 10px 34px rgba(0,0,0,.2); }
+.wh-ctx-icon { display:grid; place-items:center; width:30px; height:30px; flex:none; border-radius:8px; background:color-mix(in srgb,currentColor 12%,transparent); }
+.wh-ctx-name { width:150px; min-width:80px; padding:6px 8px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--text); font-size:13.5px; font-weight:750; }
+.wh-ctx-name:hover { border-color:var(--border); }
+.wh-ctx-name:focus { outline:0; border-color:var(--accent); background:var(--bg); }
+.wh-ctx-code { flex:none; color:var(--muted2); font-size:10.5px; }
+.wh-ctx-static { font-size:13.5px; font-weight:750; white-space:nowrap; }
+.wh-ctx-static.muted { color:var(--muted2); font-size:11px; font-weight:600; }
+.wh-ctx-count { padding:4px 9px; border-radius:7px; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:800; white-space:nowrap; }
+.wh-ctx-cap { display:inline-flex; align-items:center; gap:4px; flex:none; padding:2px; border:1px solid var(--border); border-radius:8px; background:var(--bg); }
+.wh-ctx-cap button { width:26px; height:26px; border:0; border-radius:6px; background:transparent; color:var(--text); cursor:pointer; font-size:15px; }
+.wh-ctx-cap button:hover { background:var(--surface); color:var(--accent); }
+.wh-ctx-cap b { min-width:24px; text-align:center; font-size:13px; }
+.wh-ctx-btn { display:inline-flex; align-items:center; gap:5px; min-height:30px; padding:6px 9px; flex:none; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); cursor:pointer; font-size:11.5px; font-weight:700; }
+.wh-ctx-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.wh-ctx-btn:disabled { opacity:.5; }
+.wh-ctx-btn.accent { border-color:transparent; background:var(--accent); color:#fff; }
+.wh-ctx-btn.accent:hover:not(:disabled) { color:#fff; filter:brightness(1.06); }
+.wh-ctx-btn.danger { color:#dc2626; }
+.wh-ctx-btn.danger:hover:not(:disabled) { border-color:#dc2626; color:#dc2626; }
+.wh-ctx-select { min-height:30px; max-width:150px; padding:5px 7px; flex:none; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); cursor:pointer; font-size:11.5px; font-weight:650; }
+.wh-ctx-btn.on { border-color:var(--accent); color:var(--accent); }
+/* Rozwijana lista „co tu leży" — nad pływającym panelem. */
+.wh-contents { position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:380px; max-width:86vw; max-height:240px; overflow:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:0 12px 34px rgba(0,0,0,.24); }
+.wh-contents-head { position:sticky; top:0; padding:8px 12px; border-bottom:1px solid var(--border2); background:var(--surface); font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted2); }
+.wh-contents-empty { padding:14px 12px; color:var(--muted2); font-size:12px; }
+.wh-contents-row { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--border2); font-size:12px; }
+.wh-contents-row:last-child { border-bottom:0; }
+.wh-contents-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.wh-contents-row code { flex:none; color:var(--muted2); font-size:10.5px; }
+.wh-contents-row b { flex:none; font-variant-numeric:tabular-nums; }
+
+/* ── Stan pusty ──────────────────────────────────────────────────────────── */
+.wh-empty { min-height:430px; padding:55px 24px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+.wh-empty-icon { width:64px; height:64px; border-radius:18px; display:grid; place-items:center; color:var(--accent); background:var(--accent-soft); }
+.wh-empty h3 { margin:15px 0 3px; }.wh-empty p { max-width:460px; margin:0 0 18px; color:var(--muted2); font-size:13px; }
+.wh-error { padding:9px 11px; border-radius:8px; color:#dc2626; background:color-mix(in srgb,#dc2626 8%,transparent); font-size:12px; }
+
+/* ── Modale ──────────────────────────────────────────────────────────────── */
+.wh-modal-backdrop { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(13,13,20,.55); backdrop-filter:blur(3px); }
+.wh-modal,.wh-scan-modal { width:600px; max-width:96vw; max-height:92vh; overflow:auto; border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:0 24px 65px rgba(0,0,0,.28); }.wh-scan-modal { width:520px; }
+.wh-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border2); }
+.wh-modal-head>div { display:flex; flex-direction:column; }
+.wh-modal-head small { color:var(--accent); font-size:9.5px; letter-spacing:.1em; }
+.wh-modal-head strong { font-size:16px; }
+.wh-modal-head button { border:0; background:transparent; color:var(--muted2); cursor:pointer; }
+.wh-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:18px; }
+.wh-form-grid>label>span { display:block; margin-bottom:4px; color:var(--muted2); font-size:10.5px; }
+.wh-wide { grid-column:1/3; }
+.wh-color-field { display:grid; grid-template-columns:38px 1fr; gap:6px; }
+.wh-color-field input[type=color] { width:38px; height:35px; border:1px solid var(--border); border-radius:8px; padding:3px; }
+.wh-check { align-self:end; }.wh-check>input { position:absolute; opacity:0; }
+.wh-check>span { min-height:36px; display:flex!important; align-items:center; gap:7px; margin:0!important; padding:8px 10px; border:1px solid var(--border); border-radius:8px; cursor:pointer; }
+.wh-check>input:checked+span { color:var(--accent); border-color:var(--accent); background:color-mix(in srgb,var(--accent) 7%,transparent); }
+.wh-modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:13px 18px 17px; border-top:1px solid var(--border2); }
+.wh-scan-modal>p { margin:15px 18px 0; color:var(--muted2); font-size:12px; }
+.wh-scan-steps { padding:18px; display:grid; gap:10px; }
+.wh-scan-steps label { display:grid; grid-template-columns:34px 1fr; align-items:center; border:1px solid var(--border); border-radius:10px; padding:9px 11px; }
+.wh-scan-steps b { grid-row:1/3; width:25px; height:25px; display:grid; place-items:center; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:11px; }
+.wh-scan-steps span { font-size:9.5px; color:var(--muted2); text-transform:uppercase; letter-spacing:.06em; }
+.wh-scan-steps input { border:0; padding:2px 0; min-width:0; color:var(--text); background:transparent; font:700 16px ui-monospace,monospace; }
+.wh-scan-steps input:focus { outline:0; }
+.wh-scan-submit { width:calc(100% - 36px); margin:0 18px 18px; min-height:43px; display:flex; align-items:center; justify-content:center; gap:8px; border:0; border-radius:9px; background:var(--accent); color:#fff; cursor:pointer; font-weight:750; }
+.wh-scan-submit:disabled { opacity:.45; cursor:not-allowed; }
+.wh-scan-success { padding:35px 22px; display:flex; flex-direction:column; align-items:center; gap:13px; text-align:center; color:#2f9e73; }
+.wh-scan-success strong { max-width:390px; color:var(--text); }
+
+@media(max-width:1100px){
+  .wh-layout{grid-template-columns:200px minmax(480px,1fr)}
+}
+@media(max-width:800px){
+  .wh-layout{display:flex;flex-direction:column}
+  .wh-tree{max-height:260px}
+  .wh-editor-head{align-items:flex-start;flex-direction:column;gap:8px}
+  .wh-canvas-shell{min-height:500px}
+  .wh-canvas{min-height:476px}
+  .wh-form-grid{grid-template-columns:1fr}
+  .wh-wide{grid-column:auto}
+  .wh-context{bottom:12px}
+}

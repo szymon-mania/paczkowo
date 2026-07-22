@@ -1,0 +1,81 @@
+.shipment-form {
+  margin-top: var(--space-6);
+  overflow: hidden;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.shipment-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 15px 18px 13px;
+  border-bottom: 1px solid var(--color-divider);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--accent) 11%, transparent), transparent 58%);
+}
+
+.shipment-form__eyebrow {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.shipment-form__title { margin-top: 2px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.shipment-form__source, .shipment-form__recommended {
+  display: inline-flex; align-items: center; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .03em;
+}
+.shipment-form__source { padding: 4px 9px; color: var(--accent); background: var(--accent-soft); }
+
+.shipment-form__tabs {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--bg) 58%, var(--surface));
+}
+.shipment-form__tab {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 32px;
+  padding: 6px 10px; border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--text2); background: transparent; cursor: pointer;
+  font: 500 12px/1.15 var(--font-heading); transition: .15s ease;
+}
+.shipment-form__tab:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.shipment-form__tab.is-active { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 48%, transparent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.shipment-form__recommended { padding: 2px 5px; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.shipment-form__tab.is-active .shipment-form__recommended { color: var(--accent-contrast); background: var(--accent); }
+
+.shipment-form__body { padding: 18px; }
+.shipment-form__body label { font-size: 11px; color: var(--muted); }
+.shipment-form__body input:not([type="checkbox"]):not([type="radio"]),
+.shipment-form__body select {
+  width: 100%; min-height: 36px; padding: 7px 10px;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--text); font: 13px var(--font-body);
+}
+.shipment-form__body input:not([type="checkbox"]):not([type="radio"]):hover,
+.shipment-form__body select:hover { border-color: color-mix(in srgb, var(--text) 40%, transparent); }
+.shipment-form__body input:not([type="checkbox"]):not([type="radio"]):focus,
+.shipment-form__body select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+.shipment-form__body input[type="checkbox"], .shipment-form__body input[type="radio"] { accent-color: var(--accent); }
+.shipment-form__body button { font-family: var(--font-heading); }
+.shipment-form__body > div:last-child { flex-wrap: wrap; }
+.shipment-form__action {
+  min-height: 38px; padding: 9px 14px; border-radius: var(--radius-md);
+  cursor: pointer; font-size: 13px; font-weight: 600; transition: .15s ease;
+}
+.shipment-form__action:disabled { opacity: .48; cursor: not-allowed; }
+.shipment-form__action--primary { border: 1px solid var(--accent); color: var(--accent); background: transparent; }
+.shipment-form__action--primary:not(:disabled):hover { color: var(--accent-contrast); background: var(--accent); }
+.shipment-form__action--secondary { border: 1px solid var(--color-divider); color: var(--text2); background: transparent; }
+.shipment-form__action--secondary:not(:disabled):hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+
+@media (max-width: 640px) {
+  .shipment-form__header { padding: 13px 14px; }
+  .shipment-form__body { padding: 14px; }
+  .shipment-form__tabs { padding-inline: 9px; }
+}

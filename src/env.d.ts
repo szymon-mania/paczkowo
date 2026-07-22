@@ -3,7 +3,7 @@
 
 interface ImportMetaEnv {
   /** Endpoint, na który formularz kontaktowy wysyła POST. */
-  readonly PUBLIC_CONTACT_ENDPOINT: string;
+  readonly PUBLIC_WEB3FORMS_ACCESS_KEY?: string;
 }
 
 interface ImportMeta {

@@ -1,6 +1,11 @@
 ---
 import Logo from "./Logo.astro";
-const navLinks = [{ href: "/funkcje", label: "Funkcje" }, { href: "/integracje", label: "Integracje" }, { href: "/cennik", label: "Cennik" }];
+const navLinks = [
+  { href: "/demo", label: "Demo" },
+  { href: "/funkcje", label: "Funkcje" },
+  { href: "/integracje", label: "Integracje" },
+  { href: "/cennik", label: "Cennik" },
+];
 ---
 
 <header class="sticky top-0 z-40 border-b border-white/10 bg-[#0b0b12]/95 backdrop-blur">
@@ -10,7 +15,7 @@ const navLinks = [{ href: "/funkcje", label: "Funkcje" }, { href: "/integracje",
       {navLinks.map((link) => <a href={link.href} class="text-sm font-medium text-slate-300 transition hover:text-white">{link.label}</a>)}
     </nav>
     <div class="flex items-center gap-2">
-      <a href="/login" class="hidden px-3 py-2 text-sm font-medium text-slate-300 transition hover:text-white sm:inline-flex">Zaloguj się</a>
+      <a href="/demo" class="hidden px-3 py-2 text-sm font-medium text-slate-300 transition hover:text-white sm:inline-flex">Zobacz demo</a>
       <a href="/pobierz" class="inline-flex items-center justify-center bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300">Pobierz</a>
       <button type="button" id="mobile-menu-button" aria-label="Otwórz menu" aria-expanded="false" aria-controls="mobile-menu" class="inline-flex h-9 w-9 items-center justify-center border border-white/15 text-slate-200 transition hover:border-white/30 md:hidden">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
@@ -20,7 +25,6 @@ const navLinks = [{ href: "/funkcje", label: "Funkcje" }, { href: "/integracje",
   <div id="mobile-menu" class="hidden border-t border-white/10 bg-[#10101a] px-4 py-4 md:hidden">
     <nav class="mx-auto flex max-w-7xl flex-col gap-1" aria-label="Mobilne">
       {navLinks.map((link) => <a href={link.href} class="px-3 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/5">{link.label}</a>)}
-      <a href="/login" class="px-3 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/5">Zaloguj się</a>
     </nav>
   </div>
 </header>
