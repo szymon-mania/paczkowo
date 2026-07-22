@@ -1,0 +1,58 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { downloads } from "../config/downloads";
+---
+
+<Layout
+  title="Pobierz Paczkowo dla Windows"
+  description="Pobierz najnowszą wersję Paczkowo dla systemu Windows."
+>
+  <main class="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+    <div class="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+      <section>
+        <div class="inline-flex items-center gap-2 text-sm font-medium text-brand-700 dark:text-brand-300">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+          Najnowsza stabilna wersja
+        </div>
+        <h1 class="mt-5 text-4xl font-bold text-slate-900 sm:text-5xl dark:text-white">
+          Paczkowo dla Windows
+        </h1>
+        <p class="mt-5 max-w-xl text-lg leading-8 text-slate-600 dark:text-slate-300">
+          Zarządzaj zamówieniami, wysyłkami i magazynem z jednego pulpitu. Kliknij
+          pobieranie, aby od razu dostać aktualny instalator dla Windows.
+        </p>
+
+        <a
+          href={downloads.windowsX64}
+          class="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-lg bg-brand-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:w-auto"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4.5-4.5M12 15 7.5 10.5M4 20.25h16" />
+          </svg>
+          Pobierz dla Windows
+        </a>
+
+        <ul class="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-600 dark:text-slate-300">
+          <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>Windows 10 i 11</li>
+          <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>Wersja 64-bitowa</li>
+          <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>Link zawsze aktualny</li>
+        </ul>
+      </section>
+
+      <aside class="border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+        <div class="flex h-12 w-12 items-center justify-center bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-7 w-7" aria-hidden="true"><path d="M3 5.5 10.2 4.4v7H3V5.5Zm8.4-1.3L21 3v8.4h-9.6V4.2ZM3 12.6h7.2v7L3 18.5v-5.9Zm8.4 0H21V21l-9.6-1.3v-7.1Z" /></svg>
+        </div>
+        <h2 class="mt-6 text-xl font-semibold text-slate-900 dark:text-white">Prosta instalacja</h2>
+        <ol class="mt-5 space-y-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center border border-brand-200 text-xs font-semibold text-brand-700 dark:border-brand-900 dark:text-brand-300">1</span> Pobierz instalator.</li>
+          <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center border border-brand-200 text-xs font-semibold text-brand-700 dark:border-brand-900 dark:text-brand-300">2</span> Otwórz plik <code class="font-mono text-xs">.exe</code> i przejdź przez instalator Windows.</li>
+          <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center border border-brand-200 text-xs font-semibold text-brand-700 dark:border-brand-900 dark:text-brand-300">3</span> Uruchom Paczkowo i zaloguj się do swojego konta.</li>
+        </ol>
+        <p class="mt-7 border-t border-slate-200 pt-5 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          Potrzebujesz pomocy? <a href="mailto:kontakt@paczkowo.net" class="font-medium text-brand-600 hover:underline dark:text-brand-400">Napisz do nas</a>.
+        </p>
+      </aside>
+    </div>
+  </main>
+</Layout>

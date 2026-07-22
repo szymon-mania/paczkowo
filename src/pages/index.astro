@@ -66,6 +66,7 @@ const plans = [
       "Wsparcie e-mail",
     ],
     cta: "Zacznij za darmo",
+    href: "/pobierz",
     highlight: false,
   },
   {
@@ -81,6 +82,7 @@ const plans = [
       "Wsparcie priorytetowe",
     ],
     cta: "Wybierz Pro",
+    href: "/pobierz",
     highlight: true,
   },
   {
@@ -95,6 +97,7 @@ const plans = [
       "Indywidualne integracje",
     ],
     cta: "Skontaktuj się",
+    href: "#kontakt",
     highlight: false,
   },
 ];
@@ -179,7 +182,7 @@ const icons: Record<string, string> = {
           class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
           <a
-            href="#pobierz"
+            href="/pobierz"
             class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 sm:w-auto"
           >
             <svg
@@ -399,7 +402,7 @@ const icons: Record<string, string> = {
                 ))}
               </ul>
               <a
-                href="#pobierz"
+                href={plan.href}
                 class={`mt-8 inline-flex items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition ${
                   plan.highlight
                     ? "bg-brand-600 text-white hover:bg-brand-700"
@@ -415,28 +418,28 @@ const icons: Record<string, string> = {
     </div>
   </section>
 
-  <!-- POBIERZ / WAITLISTA -->
+  <!-- KONTAKT -->
   <section
-    id="pobierz"
+    id="kontakt"
     class="border-y border-slate-200 bg-slate-50 py-20 sm:py-24 dark:border-slate-800 dark:bg-slate-900/40"
   >
     <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
       <div class="grid items-center gap-12 lg:grid-cols-2">
-        <div id="kontakt">
+        <div>
           <h2
             class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl dark:text-white"
           >
-            Pobierz aplikację
+            Masz pytanie przed instalacją?
           </h2>
           <p class="mt-4 text-lg text-slate-600 dark:text-slate-300">
-            Paczkowo jest w fazie wczesnego dostępu. Zostaw e-mail, a wyślemy Ci
-            link do pobrania, gdy tylko otworzymy zapisy.
+            Napisz, na ilu kontach sprzedajesz i co chcesz usprawnić. Pomożemy
+            ustawić Paczkowo pod Twój sposób pracy.
           </p>
           <ul class="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
             {
               [
-                "Pierwszeństwo dostępu do bety",
-                "Bez zobowiązań — wypiszesz się w każdej chwili",
+                "Pomoc przy pierwszym uruchomieniu",
+                "Pytania o Allegro, Erli i InPost",
                 "Informacje o nowych integracjach",
               ].map((item) => (
                 <li class="flex items-center gap-2.5">
