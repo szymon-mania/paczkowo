@@ -31,11 +31,11 @@ export const en: Record<T, string> = {
   [T.menu_account]: "My account",
   [T.menu_settings]: "Settings",
   [T.menu_logout]: "Log out",
-  [T.acct_premium]: "Premium",
+  [T.acct_premium]: "Paczkowo Standard",
   [T.acct_trial]: "Trial",
   [T.acct_days_left]: "{n} days left",
   [T.acct_days_renew]: "{n} days to renewal",
-  [T.acct_buy_premium]: "Buy Premium",
+  [T.acct_buy_premium]: "Buy Paczkowo Standard",
 
   [T.support_tooltip]: "Help & contact",
   [T.support_title]: "Help & contact",
@@ -132,8 +132,8 @@ export const en: Record<T, string> = {
   [T.err_support_failed]: "Could not send the request. Please try again later.",
 
   [T.upgrade_expired_title]: "Your trial has expired",
-  [T.upgrade_choose_title]: "Choose a plan",
-  [T.upgrade_desc]: "To keep using the app, buy the Premium plan. Payments are handled by Stripe (card / BLIK / Przelewy24).",
+  [T.upgrade_choose_title]: "Activate Paczkowo Standard",
+  [T.upgrade_desc]: "After the 14-day trial, the app requires an active Paczkowo Standard plan. Payments are handled by Stripe (card / BLIK / Przelewy24).",
   [T.upgrade_opening]: "Opening payment…",
   [T.upgrade_check_again]: "Check status again",
   [T.upgrade_payment_opened]: "Payment opened in your browser. After paying, come back here — the status will refresh automatically.",
@@ -189,7 +189,7 @@ export const en: Record<T, string> = {
   [T.set_logout_confirm_title]: "Log out?",
   [T.set_logout_confirm_body]: "You'll return to the sign-in screen. Local data stays on this computer.",
   [T.plan_trial]: "Trial",
-  [T.plan_premium]: "Premium",
+  [T.plan_premium]: "Paczkowo Standard",
   [T.plan_expired]: "Expired",
 
   [T.int_opening_browser]: "Opening browser…",

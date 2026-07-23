@@ -31,11 +31,11 @@ export const pl: Record<T, string> = {
   [T.menu_account]: "Moje konto",
   [T.menu_settings]: "Ustawienia",
   [T.menu_logout]: "Wyloguj",
-  [T.acct_premium]: "Premium",
+  [T.acct_premium]: "Paczkowo Standard",
   [T.acct_trial]: "Okres próbny",
   [T.acct_days_left]: "{n} dni pozostało",
   [T.acct_days_renew]: "{n} dni do odnowienia",
-  [T.acct_buy_premium]: "Kup Premium",
+  [T.acct_buy_premium]: "Kup Paczkowo Standard",
 
   [T.support_tooltip]: "Pomoc i kontakt",
   [T.support_title]: "Pomoc i kontakt",
@@ -132,8 +132,8 @@ export const pl: Record<T, string> = {
   [T.err_support_failed]: "Nie udało się wysłać zgłoszenia. Spróbuj ponownie później.",
 
   [T.upgrade_expired_title]: "Okres próbny wygasł",
-  [T.upgrade_choose_title]: "Wybierz plan",
-  [T.upgrade_desc]: "Aby korzystać z aplikacji, wykup plan Premium. Płatność obsługuje Stripe (karta / BLIK / Przelewy24).",
+  [T.upgrade_choose_title]: "Aktywuj Paczkowo Standard",
+  [T.upgrade_desc]: "Po 14 dniach testu aplikacja wymaga aktywnego planu Paczkowo Standard. Płatność obsługuje Stripe (karta / BLIK / Przelewy24).",
   [T.upgrade_opening]: "Otwieram płatność…",
   [T.upgrade_check_again]: "Sprawdź status ponownie",
   [T.upgrade_payment_opened]: "Otwarto płatność w przeglądarce. Po opłaceniu wróć tutaj — status odświeży się sam.",
@@ -189,7 +189,7 @@ export const pl: Record<T, string> = {
   [T.set_logout_confirm_title]: "Wylogować się?",
   [T.set_logout_confirm_body]: "Wrócisz do ekranu logowania. Dane lokalne pozostaną na tym komputerze.",
   [T.plan_trial]: "Okres próbny",
-  [T.plan_premium]: "Premium",
+  [T.plan_premium]: "Paczkowo Standard",
   [T.plan_expired]: "Wygasły",
 
   [T.int_opening_browser]: "Otwieram przeglądarkę…",
