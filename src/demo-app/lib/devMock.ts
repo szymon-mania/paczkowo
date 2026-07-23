@@ -1,7 +1,7 @@
 // Mock backendu Tauri do podglądu UI w przeglądarce (bez desktopu i serwera).
 // Aktywny WYŁĄCZNIE w dev (vite) i tylko z parametrem ?mock w adresie —
 // main.tsx importuje ten moduł dynamicznie, więc nie trafia do builda produkcyjnego.
-import type { Order, OrderItem } from "./types";
+import type { Order, OrderItem, Shipment } from "./types";
 import type { CreateMarketplaceOfferDraftInput, Invoice, InvoiceItem, InvoiceProviderAccount, InvoiceSellerProfile, JsonObject, KsefConnection, Offer, ReturnCase, SaveInvoice, SaveInvoiceProviderAccount, SaveInvoiceSellerProfile, SaveKsefConnection, SaveMarketplaceOfferDetails, SaveOffer, SaveReturn } from "./commerceApi";
 import type { StockProduct, WarehouseNode } from "./stockApi";
 
@@ -100,6 +100,112 @@ function makeOrders(): Order[] {
 
 const isoAt = (daysFromToday: number) => new Date(Date.now() + daysFromToday * 86400000).toISOString();
 const dateAt = (daysFromToday: number) => isoAt(daysFromToday).slice(0, 10);
+
+const DEMO_BUYERS = [
+  ["Anna", "Kowalska", "Kraków", "30-001"],
+  ["Marek", "Nowak", "Gdańsk", "80-001"],
+  ["Joanna", "Lis", "Poznań", "60-001"],
+  ["Piotr", "Zieliński", "Wrocław", "50-001"],
+  ["Katarzyna", "Mazur", "Łódź", "90-001"],
+  ["Tomasz", "Wójcik", "Lublin", "20-001"],
+  ["Magda", "Król", "Rzeszów", "35-001"],
+  ["Paweł", "Sikora", "Szczecin", "70-001"],
+] as const;
+const DEMO_STREETS = ["ul. Długa 14", "ul. Polna 8", "ul. Leśna 22", "ul. Krótka 5", "ul. Handlowa 19", "ul. Parkowa 3"] as const;
+const DEMO_SHIPMENT_STATUSES = ["CREATED", "IN_TRANSIT", "READY_FOR_PICKUP", "DELIVERED"] as const;
+
+function demoService(carrier: string, marketplace: string) {
+  if (marketplace === "erli") return "ERLI - przesyłka marketplace";
+  if (carrier === "inpost") return "InPost Paczkomat 24/7";
+  if (carrier === "dpd") return "DPD Kurier";
+  if (carrier === "dhl") return "DHL Parcel";
+  if (carrier === "orlen") return "ORLEN Paczka";
+  return "Kurier standardowy";
+}
+
+function demoTrackingNumber(carrier: string, seed: number) {
+  const padded = String(100000000000 + seed * 7919).slice(-12);
+  if (carrier === "inpost") return `64${padded}99`;
+  if (carrier === "dpd") return `DPD${padded}`;
+  if (carrier === "dhl") return `JD${padded}`;
+  if (carrier === "orlen") return `OP${padded}`;
+  return `PK${padded}`;
+}
+
+function demoShipmentExternalStatus(status: string) {
+  if (status === "DELIVERED") return "Doręczona do odbiorcy";
+  if (status === "READY_FOR_PICKUP") return "Czeka w punkcie odbioru";
+  if (status === "IN_TRANSIT") return "W drodze do sortowni";
+  return "Etykieta utworzona";
+}
+
+function decorateDemoOrders(orders: Order[]): Order[] {
+  return orders.map((order, index) => {
+    const [firstName, lastName, city, zipCode] = DEMO_BUYERS[index % DEMO_BUYERS.length];
+    const street = DEMO_STREETS[index % DEMO_STREETS.length];
+    const service = demoService(order.carrier, order.marketplace);
+    const orderTime = Date.parse(order.orderCreatedAt ?? new Date().toISOString());
+    const paidAt = order.derivedStatus !== "nieoplacone" && order.derivedStatus !== "anulowane"
+      ? new Date(orderTime + 36 * 60 * 1000).toISOString()
+      : undefined;
+    const enriched: Order = {
+      ...order,
+      buyerFirstName: firstName,
+      buyerLastName: lastName,
+      buyerLogin: `${firstName.toLowerCase()}.${lastName.toLowerCase()}`,
+      buyerEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.pl`,
+      buyerStreet: street,
+      buyerZipCode: zipCode,
+      buyerCity: city,
+      deliveryFirstName: firstName,
+      deliveryLastName: lastName,
+      deliveryStreet: street,
+      deliveryZipCode: zipCode,
+      deliveryCity: city,
+      deliveryCountry: "PL",
+      deliveryMethodId: order.deliveryMethodId ?? `dm-${(index % 5) + 1}`,
+      deliveryMethodName: order.deliveryMethodName ?? service,
+      deliveryCost: order.deliveryCost ?? "12.99",
+      deliveryCurrency: order.deliveryCurrency ?? (order.currency ?? "PLN"),
+      paymentFinishedAt: paidAt,
+      paymentAmount: paidAt ? order.totalToPay : undefined,
+      paymentCurrency: paidAt ? order.currency : undefined,
+    };
+
+    if (order.derivedStatus === "nieoplacone" || order.derivedStatus === "anulowane" || index % 6 === 5) {
+      return enriched;
+    }
+
+    const status = order.derivedStatus === "do_wyslania" ? "CREATED" : DEMO_SHIPMENT_STATUSES[index % DEMO_SHIPMENT_STATUSES.length];
+    const createdAt = new Date(orderTime + ((index % 8) + 1) * 60 * 60 * 1000).toISOString();
+    const trackingNumber = index % 9 === 0 ? undefined : demoTrackingNumber(order.carrier, order.id);
+    const provider = order.marketplace === "allegro" && index % 2 === 0
+      ? "allegro_wza"
+      : order.marketplace === "erli"
+        ? "erli"
+        : order.carrier === "inpost"
+          ? "inpost_shipx"
+          : "allegro_order_tracking";
+    const shipment: Shipment = {
+      id: `demo-shp-${order.id}`,
+      provider,
+      marketplace: order.marketplace,
+      trackingNumber,
+      carrier: order.carrier,
+      service,
+      labelPath: provider === "allegro_wza" || !trackingNumber ? undefined : `C:/Paczkowo/demo/etykiety/${order.externalOrderId}.pdf`,
+      status,
+      externalStatus: demoShipmentExternalStatus(status),
+      createdAt,
+    };
+    return {
+      ...enriched,
+      derivedStatus: status === "CREATED" ? enriched.derivedStatus : "wyslane",
+      externalUpdatedAt: createdAt,
+      shipments: [shipment],
+    };
+  });
+}
 
 function makeOffers(): Offer[] {
   const base = { sourcePlatform: "manual", syncStatus: "LOCAL_ONLY" as const, currency: "PLN", taxRate: "23", conditionCode: "NEW", validationIssues: [], revision: 1, createdAt: isoAt(-35) };
@@ -326,7 +432,7 @@ export function installDevMock() {
   if ((window as unknown as Record<string, boolean>).__PACZKOWO_DEMO_MOCK__) return;
   (window as unknown as Record<string, boolean>).__PACZKOWO_DEMO_MOCK__ = true;
 
-  const orders = makeOrders().slice(0, 10);
+  const orders = decorateDemoOrders(makeOrders().slice(0, 36));
   let offers = makeOffers();
   const devLogs: { timestamp: string; level: string; target: string; message: string }[] = [];
   const devLog = (level: string, message: string) => {
@@ -350,6 +456,26 @@ export function installDevMock() {
   ];
   // Integracje mutowalne — obsługa zmiany nazwy / przełącznika zbierania zamówień w podglądzie.
   let integrations = MARKETS.map((m, i) => ({ id: `int-${i + 1}`, platform: m.mkt, accountName: m.account, collectOrders: true }));
+  const findOrder = (orderDbId?: unknown, orderId?: unknown) => orders.find((order) => order.id === Number(orderDbId) || order.externalOrderId === String(orderId));
+  const addShipment = (order: Order, provider: string, carrier: string, service: string, trackingNumber?: string) => {
+    const createdAt = new Date().toISOString();
+    const shipment: Shipment = {
+      id: `demo-shp-${order.id}-${order.shipments.length + 1}`,
+      provider,
+      marketplace: order.marketplace,
+      trackingNumber: trackingNumber || demoTrackingNumber(carrier, order.id + order.shipments.length + 100),
+      carrier,
+      service,
+      labelPath: `C:/Paczkowo/demo/etykiety/${order.externalOrderId}-${order.shipments.length + 1}.pdf`,
+      status: "CREATED",
+      externalStatus: "Etykieta utworzona w demo",
+      createdAt,
+    };
+    order.shipments = [shipment, ...(order.shipments ?? [])];
+    order.derivedStatus = "wyslane";
+    order.externalUpdatedAt = createdAt;
+    return shipment;
+  };
   let stockProducts: StockProduct[] = PRODUCTS.map((p, index) => {
     const qty = [128, 246, 74, 42, 9, 18, 0][index];
     const locations = ["H1-R01", "H1-R02", "H1-R03", "H1-P01", "H1-R01", null, null];
@@ -479,7 +605,74 @@ export function installDevMock() {
   };
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
     invoke: async (cmd: string, args?: Record<string, unknown>) => {
-      if (cmd === "open_url") return null;
+      if (cmd === "open_url" || cmd === "open_file" || cmd === "print_label") return null;
+      if (cmd === "get_orders") return { orders: structuredClone(orders) };
+      if (cmd === "get_shipments_info") {
+        const ids = (args?.shipmentIds as string[] | undefined) ?? [];
+        return ids.map((id) => {
+          const order = orders.find((item) => item.shipments.some((shipment) => shipment.id === id));
+          const shipment = order?.shipments.find((item) => item.id === id);
+          return {
+            id,
+            carrier: shipment?.carrier,
+            transport: shipment?.carrier ? [shipment.carrier] : [],
+            createdDate: shipment?.createdAt,
+            canceled: shipment?.status === "CANCELED",
+            waybills: shipment?.trackingNumber ? [shipment.trackingNumber] : [],
+          };
+        });
+      }
+      if (cmd === "get_label") {
+        const shipmentId = ((args?.shipmentIds as string[] | undefined) ?? ["demo-label"])[0];
+        return `C:/Paczkowo/demo/etykiety/${shipmentId}.pdf`;
+      }
+      if (cmd === "cancel_shipment") {
+        const order = findOrder(args?.orderDbId, args?.orderId);
+        const shipment = order?.shipments.find((item) => item.id === args?.shipmentId);
+        if (shipment) {
+          shipment.status = "CANCELED";
+          shipment.externalStatus = "Anulowana w demo";
+        }
+        return null;
+      }
+      if (cmd === "mark_order_sent") {
+        const order = findOrder(args?.orderDbId, args?.orderId);
+        if (order) order.derivedStatus = "wyslane";
+        return null;
+      }
+      if (cmd === "get_erli_posting_points") return [
+        { id: 1001, groupId: "erliPaczkomat", isDefault: true },
+        { id: 1002, groupId: "erliKurier24InPost", isDefault: false },
+        { id: 1003, groupId: "erliDHL", isDefault: false },
+      ];
+      if (cmd === "get_delivery_proposal") return { suggestedInput: { packages: [{ type: "PACKAGE", length: { value: 24, unit: "CENTIMETER" }, width: { value: 18, unit: "CENTIMETER" }, height: { value: 8, unit: "CENTIMETER" }, weight: { value: 0.6, unit: "KILOGRAMS" } }] } };
+      if (cmd === "create_shipment") {
+        const order = findOrder(args?.orderDbId, args?.orderId);
+        if (!order) throw new Error("Order not found");
+        const shipment = addShipment(order, "allegro_wza", order.carrier || "inpost", order.deliveryMethodName || demoService(order.carrier || "inpost", order.marketplace));
+        return { shipmentId: shipment.id, shipmentIds: [shipment.id] };
+      }
+      if (cmd === "create_inpost_shipment" || cmd === "create_inpost_merchant_shipment") {
+        const request = (args?.request ?? {}) as { orderDbId?: number; orderId?: string; serviceOverride?: string };
+        const order = findOrder(request.orderDbId, request.orderId);
+        if (!order) throw new Error("Order not found");
+        const service = request.serviceOverride || "inpost_locker_standard";
+        const shipment = addShipment(order, cmd === "create_inpost_merchant_shipment" ? "inpost_merchant" : "inpost_shipx", "inpost", service);
+        return { shipmentId: shipment.id, trackingNumber: shipment.trackingNumber, labelPath: shipment.labelPath, service };
+      }
+      if (cmd === "create_erli_parcel") {
+        const request = (args?.request ?? {}) as { orderDbId?: number; orderId?: string; shippingTypeId?: string };
+        const order = findOrder(request.orderDbId, request.orderId);
+        if (!order) throw new Error("Order not found");
+        const shipment = addShipment(order, "erli", order.carrier || "dpd", request.shippingTypeId || "erliPaczkomat");
+        return { parcelId: shipment.id, status: shipment.externalStatus, trackingNumber: shipment.trackingNumber, labelPath: shipment.labelPath };
+      }
+      if (cmd === "erli_mark_shipped") {
+        const order = findOrder(args?.orderDbId, args?.orderId);
+        if (!order) throw new Error("Order not found");
+        addShipment(order, "erli", String(args?.vendor ?? "dpd"), "Oznaczono ręcznie", String(args?.trackingNumber ?? ""));
+        return null;
+      }
       if (cmd === "start_allegro_auth") {
         const number = integrations.filter((item) => item.platform === "allegro").length + 1;
         integrations.push({ id: `demo-allegro-${number}`, platform: "allegro", accountName: `allegro_demo_${number}`, collectOrders: true });

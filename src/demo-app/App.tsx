@@ -1660,7 +1660,8 @@ export default function App() {
 
       publishProgress(progress);
       if (runnableSteps.length === 0) {
-        publishProgress({ ...progress, done: true });
+        clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
+        setSyncProgress(null);
         setSyncMsg({
           text: lang === "pl"
             ? "Nie uruchomiono synchronizacji: konta wymagają ponownego połączenia albo mają wyłączone zbieranie zamówień."
@@ -1703,7 +1704,8 @@ export default function App() {
       markStep(refreshStep.key, "active");
       await loadOrders();
       markStep(refreshStep.key, "done");
-      publishProgress({ ...progress, done: true });
+      clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
+      setSyncProgress(null);
 
       if (progress.accountsSynced > 0) {
         const now = new Date();
@@ -1715,16 +1717,10 @@ export default function App() {
         setSyncMsg({ text: `Synchronizacja zakończona z błędami: ${[...new Set(warnings)].join(" | ")}`, ok: false });
       } else {
         setSyncMsg({ text: `Zsync: ${progress.accountsSynced} kont | ${progress.saved} zapisanych`, ok: true });
-        const finishedSyncStartedAt = progress.startedAt;
-        window.setTimeout(() => {
-          setSyncProgress((current) => {
-            if (current?.startedAt !== finishedSyncStartedAt) return current;
-            clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
-            return null;
-          });
-        }, 8000);
       }
     } catch (e) {
+      clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
+      setSyncProgress(null);
       setSyncMsg({ text: t(T.common_error_with_message, { message: translateMessage(e, t) }), ok: false });
     } finally {
       syncingRef.current = false;
@@ -1919,6 +1915,10 @@ export default function App() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "var(--font-body)", background: "var(--bg)", color: "var(--text)" }}>
       {/* ── Górny pasek nawigacji (styl Ordigo) ── */}
       <nav className="nav">
+        <a href="/" className="demo-exit-link" aria-label="Wyjdź z demo i wróć na stronę główną">
+          <ChevronLeft size={16} />
+          <span>Wyjdź z demo</span>
+        </a>
         <span className="nav-brand" aria-label="Paczkowo">
           <PackLogo size={50} alt="" src="/logos/logo150.png" />
           <span>Paczkowo</span>

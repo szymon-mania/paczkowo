@@ -28,7 +28,6 @@ export const ORDER_SYNC_PROGRESS_KEY = "orderSyncProgress";
 export const OFFER_SYNC_PROGRESS_KEY = "offerSyncProgress";
 
 const ACTIVE_TTL_MS = 30 * 60 * 1000;
-const DONE_TTL_MS = 8 * 1000;
 
 function isProgressState(value: unknown): value is SyncProgressState {
   if (!value || typeof value !== "object") return false;
@@ -49,8 +48,7 @@ export function readSyncProgress(storageKey: string): SyncProgressState | null {
       return null;
     }
     const age = Date.now() - value.updatedAt;
-    const hasError = value.steps.some((step) => step.status === "error");
-    if (age > ACTIVE_TTL_MS || (value.done && !hasError && age > DONE_TTL_MS)) {
+    if (value.done || age > ACTIVE_TTL_MS) {
       localStorage.removeItem(storageKey);
       return null;
     }
