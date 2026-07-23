@@ -2,9 +2,11 @@
 import Layout from "../layouts/Layout.astro";
 
 const integrations = [
-  { image: "/brand/allegro.png", name: "Allegro", type: "Marketplace", text: "Zamówienia, oferty i wysyłka w jednym rytmie pracy." },
-  { image: "/brand/erli.png", name: "Erli", type: "Marketplace", text: "Obsługa sprzedaży bez przełączania się między panelami." },
-  { image: "/brand/inpost.png", name: "InPost", type: "Wysyłka", text: "Przesyłki, etykiety i nadania gotowe do codziennej pracy." },
+  { image: "/brand/allegro.png", name: "Allegro" },
+  { image: "/brand/erli.png", name: "Erli" },
+  { image: "/brand/inpost.png", name: "InPost" },
+  { image: "/logos/inpost_merchant.png", name: "InPost Merchant" },
+  { image: "/logos/inpost.png", name: "InPost ShipX" },
 ];
 ---
 
@@ -21,27 +23,14 @@ const integrations = [
     <section class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div class="grid gap-px border border-white/10 bg-white/10 md:grid-cols-2 lg:grid-cols-3">
         {integrations.map((integration) => (
-          <article class="bg-[#101019] p-8">
-            <div class="flex h-14 items-center">
-              <img src={integration.image} alt={integration.name} class="max-h-10 max-w-32 object-contain object-left" />
-            </div>
-            <p class="mt-10 text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">{integration.type}</p>
-            <h2 class="mt-3 text-2xl font-semibold text-white">{integration.name}</h2>
-            <p class="mt-4 text-sm leading-7 text-slate-400">{integration.text}</p>
+          <article class="flex min-h-48 flex-col items-center justify-center bg-[#101019] p-8 text-center">
+            <img src={integration.image} alt={integration.name} class="max-h-14 max-w-44 object-contain" />
+            <h2 class="mt-7 text-xl font-semibold text-white">{integration.name}</h2>
           </article>
         ))}
-        <article class="bg-[#101019] p-8">
-          <div class="flex h-14 items-center"><span class="border border-brand-300/40 bg-brand-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-200">Wkrótce</span></div>
-          <p class="mt-10 text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Nowe połączenia</p>
-          <h2 class="mt-3 text-2xl font-semibold text-white">Więcej informacji</h2>
-          <p class="mt-4 text-sm leading-7 text-slate-400">Kolejne integracje pojawią się w tym miejscu.</p>
-        </article>
-        <article class="hidden bg-[#101019]/70 p-8 md:block" aria-hidden="true"></article>
-        <a href="/kontakt#formularz" class="group bg-[#101019] p-8 transition hover:bg-[#151522]">
-          <div class="flex h-14 items-center"><span class="border border-white/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300 transition group-hover:border-brand-300 group-hover:text-brand-200">Formularz</span></div>
-          <p class="mt-10 text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Brakuje integracji?</p>
-          <h2 class="mt-3 text-2xl font-semibold text-white">Zgłoś integrację</h2>
-          <p class="mt-4 text-sm leading-7 text-slate-400">Napisz, którą platformę mamy dodać.</p>
+        <a href="/kontakt#formularz" class="group flex min-h-48 flex-col items-center justify-center bg-[#101019] p-8 text-center transition hover:bg-[#151522]">
+          <span class="border border-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300 transition group-hover:border-brand-300 group-hover:text-brand-200">Zgłoś integrację</span>
+          <h2 class="mt-7 text-xl font-semibold text-white">Brakuje platformy?</h2>
         </a>
       </div>
     </section>
