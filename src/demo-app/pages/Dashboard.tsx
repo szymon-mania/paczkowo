@@ -51,6 +51,9 @@ function orderDate(o: Order): Date | null {
   const d = new Date(o.orderCreatedAt);
   return isNaN(d.getTime()) ? null : d;
 }
+function accountLabel(o: Order) {
+  return o.accountDisplayName || o.accountName || null;
+}
 // Popularne waluty e-commerce — do wyboru nawet bez zamówień w danej walucie.
 const COMMON_CURRENCIES = ["PLN", "EUR", "USD", "GBP", "CZK", "SEK", "NOK", "DKK", "HUF", "RON", "BGN", "CHF", "UAH"];
 
@@ -137,15 +140,19 @@ export default function Dashboard({ orders }: { orders: Order[] }) {
 
     // Fasety do popovera filtrów — liczone przed zawężeniem (standardowe zachowanie filtrów).
     const chanCnt = new Map<string, number>();
-    const acctCnt = new Map<string, number>();
+    const acctCnt = new Map<string, { label: string; count: number }>();
     for (const o of allRange) {
       const mk = (o.marketplace ?? "").toLowerCase();
       chanCnt.set(mk, (chanCnt.get(mk) ?? 0) + 1);
       const ac = o.accountName ?? "";
-      if (ac) acctCnt.set(ac, (acctCnt.get(ac) ?? 0) + 1);
+      const label = accountLabel(o);
+      if (ac && label) {
+        const existing = acctCnt.get(ac);
+        acctCnt.set(ac, { label, count: (existing?.count ?? 0) + 1 });
+      }
     }
     const facetChannels = [...chanCnt.entries()].sort((a, b) => b[1] - a[1]).map(([key, count]) => ({ key, label: channelLabel(key, t), count }));
-    const facetAccounts = [...acctCnt.entries()].sort((a, b) => b[1] - a[1]).map(([key, count]) => ({ key, count }));
+    const facetAccounts = [...acctCnt.entries()].sort((a, b) => b[1].count - a[1].count).map(([key, value]) => ({ key, label: value.label, count: value.count }));
 
     const pass = (o: Order) =>
       (selChannels.size === 0 || selChannels.has((o.marketplace ?? "").toLowerCase())) &&
@@ -207,7 +214,7 @@ export default function Dashboard({ orders }: { orders: Order[] }) {
     };
     const byChannel = mkBreakdown((o) => channelLabel(o.marketplace, t));
     const byCarrier = mkBreakdown((o) => carrierLabel(o.carrier, t));
-    const byAccount = mkBreakdown((o) => o.accountName ?? null);
+    const byAccount = mkBreakdown(accountLabel);
 
     // Top produkty (przychód + sztuki)
     const byProduct = new Map<string, { name: string; sku: string; sold: number; revenue: number }>();
@@ -312,7 +319,7 @@ export default function Dashboard({ orders }: { orders: Order[] }) {
                   {d.facetAccounts.map((a) => (
                     <label key={a.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 2px", fontSize: 13, cursor: "pointer" }}>
                       <input type="checkbox" checked={selAccounts.has(a.key)} onChange={() => toggleAccount(a.key)} />
-                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.key}</span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.label}</span>
                       <span className="text-muted" style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{a.count}</span>
                     </label>
                   ))}

@@ -1,13 +1,225 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import LegalDocument from "../components/LegalDocument.astro";
+import LegalDocument, { type LegalSection } from "../components/LegalDocument.astro";
+import { company, companyLine } from "../config/company";
 
-const sections = [
-  { title: "Postanowienia ogólne", paragraphs: ["Niniejsze warunki określają zasady korzystania z aplikacji Paczkowo oraz strony paczkowo.net.", "Usługodawcą jest Solar Tech Damian Mania, ul. Skrajna 1, 64-610 Rogoźno, NIP: 787-191-82-71. Osobą prowadzącą działalność jest Damian Mania."] },
-  { title: "Konto i dostęp", paragraphs: ["Użytkownik jest zobowiązany korzystać z aplikacji zgodnie z prawem, warunkami dostawców integracji oraz niniejszymi warunkami.", "Użytkownik odpowiada za zabezpieczenie swojego urządzenia, danych logowania i uprawnień do podłączonych kont sprzedażowych."] },
-  { title: "Integracje zewnętrzne", paragraphs: ["Paczkowo umożliwia połączenie z usługami zewnętrznymi, takimi jak Allegro, Erli i InPost. Dostęp oraz zakres danych zależą od uprawnień nadanych przez użytkownika.", "Dostawcy usług zewnętrznych mogą wprowadzać własne ograniczenia, przerwy techniczne lub zmiany w API."] },
-  { title: "Odpowiedzialność", paragraphs: ["Użytkownik przed wykonaniem operacji wysyłkowej, magazynowej lub sprzedażowej powinien zweryfikować dane widoczne w aplikacji.", "Usługodawca podejmuje uzasadnione działania dla ciągłości działania aplikacji, jednak nie gwarantuje braku przerw wynikających z działania dostawców zewnętrznych lub infrastruktury użytkownika."] },
-  { title: "Kontakt i zmiany", paragraphs: ["Pytania dotyczące korzystania z aplikacji można kierować na adres kontakt@paczkowo.net.", "Warunki mogą być aktualizowane. Aktualna wersja jest publikowana na tej stronie wraz z datą aktualizacji."] },
+const mail = `<a class="text-brand-300 hover:text-white" href="mailto:${company.email}">${company.email}</a>`;
+
+const sections: LegalSection[] = [
+  {
+    title: "Postanowienia ogólne",
+    blocks: [
+      `Niniejsze Warunki korzystania („Warunki") określają zasady korzystania ze strony internetowej <strong>${company.site}</strong> oraz z aplikacji desktopowej <strong>Paczkowo</strong>, a także zasady zawierania i rozwiązywania umowy o świadczenie usług drogą elektroniczną.`,
+      `Operatorem strony i Usługodawcą jest <strong>${companyLine}</strong>, adres poczty elektronicznej: ${mail} („Usługodawca").`,
+      "Warunki stanowią regulamin świadczenia usług drogą elektroniczną w rozumieniu ustawy z dnia 18 lipca 2002 r. o świadczeniu usług drogą elektroniczną.",
+      "Rozpoczęcie korzystania ze strony, pobranie, instalacja lub uruchomienie Aplikacji oznacza akceptację Warunków. Osoba, która nie akceptuje Warunków, nie może korzystać z Aplikacji ani z Usługi.",
+      "Warunki są nieodpłatnie udostępnione na tej stronie w formie umożliwiającej ich pobranie, utrwalenie i wydrukowanie.",
+    ],
+  },
+  {
+    title: "Definicje",
+    blocks: [
+      [
+        "<strong>Aplikacja</strong> — program komputerowy Paczkowo przeznaczony na system Windows, wraz z aktualizacjami, dokumentacją i materiałami towarzyszącymi.",
+        "<strong>Usługa</strong> — usługi świadczone drogą elektroniczną przez Usługodawcę: udostępnienie Aplikacji, prowadzenie Konta, obsługa licencji, aktualizacji i pomocy technicznej oraz udostępnienie strony i demo.",
+        "<strong>Użytkownik</strong> — osoba fizyczna, osoba prawna lub jednostka organizacyjna korzystająca z Aplikacji lub Usługi.",
+        "<strong>Konto</strong> — indywidualne konto Użytkownika na serwerze Usługodawcy, uprawniające do korzystania z Aplikacji.",
+        "<strong>Licencja</strong> — niewyłączne uprawnienie do korzystania z Aplikacji w zakresie i na czas określony w Warunkach.",
+        "<strong>Integracje</strong> — połączenia Aplikacji z usługami podmiotów trzecich (m.in. Allegro, Erli, InPost, KSeF), realizowane na podstawie upoważnienia udzielonego przez Użytkownika.",
+        "<strong>Okres próbny</strong> — 14 dni bezpłatnego korzystania z pełnej funkcjonalności Aplikacji.",
+      ],
+    ],
+  },
+  {
+    title: "Zakres usługi",
+    blocks: [
+      "Aplikacja jest narzędziem wspierającym obsługę sprzedaży: pobiera i porządkuje zamówienia z podłączonych kanałów sprzedaży, umożliwia tworzenie przesyłek i etykiet u przewoźników, prowadzenie magazynu, obsługę zwrotów oraz wystawianie faktur.",
+      "Aplikacja działa lokalnie na urządzeniu Użytkownika. Dane zamówień, magazynu i faktur są przechowywane w lokalnej bazie danych na tym urządzeniu. Serwer Usługodawcy obsługuje konto, licencję, aktualizacje oraz pośredniczy w autoryzacji Integracji.",
+      "Usługodawca nie jest stroną umów zawieranych przez Użytkownika z jego klientami, z operatorami platform sprzedażowych ani z przewoźnikami. Aplikacja jedynie porządkuje i przekazuje dane w imieniu Użytkownika i na jego polecenie.",
+      "Demo dostępne na stronie działa wyłącznie na danych przykładowych, nie łączy się z żadnym kontem sprzedażowym i nie służy do prowadzenia realnej sprzedaży.",
+    ],
+  },
+  {
+    title: "Wymagania techniczne",
+    blocks: [
+      "Do korzystania z Aplikacji niezbędne są: komputer z systemem Windows w wersji wspieranej przez producenta, stałe połączenie z internetem, aktywne konto poczty elektronicznej oraz konta w usługach, które Użytkownik chce podłączyć.",
+      "Do korzystania ze strony wystarczy przeglądarka internetowa w aktualnej wersji z obsługą JavaScript.",
+      "Usługodawca nie odpowiada za nieprawidłowe działanie Aplikacji wynikające z niespełnienia wymagań technicznych, konfiguracji urządzenia Użytkownika, oprogramowania zabezpieczającego lub ograniczeń sieciowych po stronie Użytkownika.",
+    ],
+  },
+  {
+    title: "Konto i zawarcie umowy",
+    blocks: [
+      "Korzystanie z Aplikacji wymaga założenia Konta. Rejestracja wymaga podania prawdziwych i aktualnych danych oraz potwierdzenia adresu e-mail i numeru telefonu.",
+      "Umowa o świadczenie Usługi zostaje zawarta z chwilą aktywacji Konta na czas nieokreślony.",
+      "Konto jest przypisane do jednego Użytkownika. Użytkownik odpowiada za zachowanie poufności danych logowania i za wszystkie czynności wykonane po zalogowaniu na jego Konto.",
+      "Użytkownik jest zobowiązany niezwłocznie poinformować Usługodawcę o podejrzeniu nieuprawnionego dostępu do Konta.",
+      "Usługodawca może odmówić rejestracji lub zablokować Konto, jeżeli podane dane są nieprawdziwe albo jeżeli Konto jest wykorzystywane niezgodnie z Warunkami.",
+    ],
+  },
+  {
+    title: "Licencja na Aplikację",
+    blocks: [
+      "Aplikacja jest utworem chronionym prawem autorskim. Usługodawcy przysługują wszelkie prawa do Aplikacji, jej kodu źródłowego i wynikowego, interfejsu, grafik, treści, dokumentacji, nazwy i logotypu.",
+      "Z chwilą aktywacji Konta Usługodawca udziela Użytkownikowi <strong>niewyłącznej, nieprzenoszalnej i niezbywalnej licencji</strong> na korzystanie z Aplikacji, ograniczonej do okresu obowiązywania aktywnej licencji lub Okresu próbnego, wyłącznie w zakresie własnej działalności Użytkownika.",
+      "Licencja obejmuje prawo do zainstalowania i uruchamiania Aplikacji na urządzeniach będących w dyspozycji Użytkownika oraz do sporządzenia jednej kopii zapasowej w zakresie dozwolonym przepisami prawa.",
+      "Licencja nie obejmuje przeniesienia jakichkolwiek praw autorskich ani prawa do udzielania sublicencji. Wszelkie prawa nieudzielone wprost w Warunkach pozostają zastrzeżone na rzecz Usługodawcy.",
+      "Licencja wygasa z chwilą wygaśnięcia lub rozwiązania umowy, zakończenia Okresu próbnego bez wykupienia abonamentu albo zablokowania Konta z przyczyn wskazanych w Warunkach. Po wygaśnięciu Licencji Użytkownik jest zobowiązany zaprzestać korzystania z Aplikacji i usunąć ją ze swoich urządzeń.",
+    ],
+  },
+  {
+    title: "Ograniczenia licencyjne i zakaz obchodzenia zabezpieczeń",
+    blocks: [
+      "Użytkownik nie jest uprawniony, samodzielnie ani za pośrednictwem osób trzecich, do:",
+      [
+        "kopiowania, powielania, publikowania, rozpowszechniania, wprowadzania do obrotu, sprzedaży, odsprzedaży, najmu, dzierżawy, użyczania, wypożyczania ani udostępniania Aplikacji lub jej części osobom trzecim, w tym w modelu usługowym lub hostowanym;",
+        "udostępniania Konta, danych logowania, klucza licencyjnego lub tokenu dostępowego osobom trzecim, a także wykorzystywania jednej licencji przez więcej niż jeden podmiot;",
+        "usuwania, wyłączania, obchodzenia, modyfikowania lub w jakikolwiek sposób osłabiania mechanizmów licencyjnych, weryfikacji konta, limitów, zabezpieczeń technicznych oraz weryfikacji podpisu cyfrowego aktualizacji;",
+        "tworzenia, używania lub rozpowszechniania cracków, keygenów, patchy, podmienionych plików wykonywalnych, zmodyfikowanych bibliotek ani innych narzędzi służących do uzyskania nieuprawnionego dostępu do Aplikacji lub jej funkcji;",
+        "dekompilowania, deasemblowania, odtwarzania kodu źródłowego (reverse engineering) ani innego badania Aplikacji w celu odtworzenia jej kodu lub logiki działania — z wyłączeniem przypadków, w których uprawnienie takie przysługuje na podstawie bezwzględnie obowiązujących przepisów prawa, w szczególności art. 75 ust. 2 i 3 ustawy o prawie autorskim i prawach pokrewnych;",
+        "modyfikowania, tłumaczenia, adaptowania Aplikacji ani tworzenia na jej podstawie opracowań i utworów zależnych;",
+        "wykorzystywania Aplikacji, jej interfejsu, struktury, treści lub dokumentacji do zbudowania produktu konkurencyjnego albo do świadczenia usług konkurencyjnych wobec Usługodawcy;",
+        "usuwania lub zmieniania oznaczeń autorskich, informacji o prawach, znaków towarowych i not licencyjnych;",
+        "podejmowania prób nieuprawnionego dostępu do serwerów, baz danych, interfejsów API lub kont innych Użytkowników;",
+        "automatycznego pobierania danych (scraping), zwielokrotniania zapytań, testów obciążeniowych ani innych działań zakłócających stabilność Usługi albo obchodzących limity liczby żądań;",
+        "wprowadzania do Aplikacji lub Usługi złośliwego oprogramowania, kodu o charakterze destrukcyjnym ani treści bezprawnych.",
+      ],
+      "Naruszenie któregokolwiek z powyższych zakazów stanowi istotne naruszenie Warunków i uprawnia Usługodawcę do natychmiastowego zablokowania Konta i wypowiedzenia umowy ze skutkiem natychmiastowym, bez zwrotu opłat za bieżący okres rozliczeniowy, niezależnie od dalszych roszczeń przewidzianych prawem.",
+      "Zabezpieczenia Aplikacji stanowią skuteczne techniczne środki zabezpieczające w rozumieniu przepisów o prawie autorskim. Ich obchodzenie oraz obrót narzędziami do tego służącymi może stanowić naruszenie prawa, w tym rodzić odpowiedzialność karną.",
+    ],
+  },
+  {
+    title: "Dozwolone korzystanie",
+    blocks: [
+      "Użytkownik zobowiązuje się korzystać z Aplikacji zgodnie z prawem, dobrymi obyczajami, Warunkami oraz regulaminami platform i przewoźników, z którymi łączy Aplikację.",
+      "Użytkownik odpowiada za zgodność z prawem danych wprowadzanych do Aplikacji i przekazywanych za jej pośrednictwem, w tym danych osobowych swoich klientów oraz treści ofert, faktur i dokumentów przewozowych.",
+      "Zabronione jest wykorzystywanie Aplikacji do działań niezgodnych z prawem, w szczególności do obrotu towarami, którymi obrót jest zakazany lub ograniczony, do naruszania praw osób trzecich albo do rozsyłania niezamówionych informacji handlowych.",
+    ],
+  },
+  {
+    title: "Okres próbny, opłaty i płatności",
+    blocks: [
+      "Nowy Użytkownik otrzymuje 14-dniowy Okres próbny obejmujący pełną funkcjonalność Aplikacji, bez konieczności podawania danych karty płatniczej. Okres próbny przysługuje jednorazowo.",
+      "Po zakończeniu Okresu próbnego dalsze korzystanie z Aplikacji wymaga wykupienia abonamentu w cenie <strong>150 zł miesięcznie</strong>. Aktualne warunki cenowe są publikowane na stronie <a class=\"text-brand-300 hover:text-white\" href=\"/cennik\">Cennik</a>.",
+      "Abonament jest odnawialny w kolejnych okresach rozliczeniowych do czasu rezygnacji. Płatności obsługuje zewnętrzny operator płatności; Usługodawca nie przechowuje danych karty płatniczej.",
+      "Brak opłaty za kolejny okres skutkuje wygaśnięciem licencji i ograniczeniem dostępu do funkcji Aplikacji. Dane zapisane lokalnie na urządzeniu Użytkownika pozostają na tym urządzeniu.",
+      "Usługodawca może zmienić wysokość opłat. O zmianie Użytkownik zostanie poinformowany co najmniej 30 dni przed jej wejściem w życie; zmiana nie dotyczy opłaconego już okresu rozliczeniowego. Brak akceptacji nowej ceny uprawnia do wypowiedzenia umowy ze skutkiem na koniec bieżącego okresu.",
+    ],
+  },
+  {
+    title: "Aktualizacje",
+    blocks: [
+      "Usługodawca udostępnia aktualizacje Aplikacji. Aktualizacje są pobierane z serwera Usługodawcy i instalowane wyłącznie po weryfikacji podpisu cyfrowego.",
+      "Użytkownik przyjmuje do wiadomości, że korzystanie z nieaktualnej wersji Aplikacji może uniemożliwić poprawne działanie Integracji, ponieważ dostawcy zewnętrzni zmieniają swoje interfejsy niezależnie od Usługodawcy.",
+      "Instalowanie Aplikacji lub jej aktualizacji ze źródeł innych niż oficjalne kanały Usługodawcy jest zabronione i odbywa się na wyłączne ryzyko Użytkownika.",
+    ],
+  },
+  {
+    title: "Integracje zewnętrzne",
+    blocks: [
+      "Aplikacja umożliwia połączenie z usługami podmiotów trzecich, w szczególności Allegro, Erli, InPost oraz KSeF. Połączenie następuje wyłącznie na podstawie autoryzacji udzielonej przez Użytkownika, w zakresie uprawnień przez niego nadanych.",
+      "Korzystanie z Integracji podlega dodatkowo regulaminom i politykom właściwych dostawców. Użytkownik odpowiada za posiadanie ważnych umów i uprawnień u tych dostawców.",
+      "Dostawcy zewnętrzni mogą w każdym czasie zmienić zakres, zasady lub limity swoich interfejsów, wprowadzić przerwy techniczne albo ograniczyć dostęp. Usługodawca nie ponosi odpowiedzialności za takie zdarzenia ani za ich skutki, jednak dołoży starań, aby dostosować Aplikację do zmian.",
+      "Usługodawca może czasowo wyłączyć Integrację, jeżeli jej dalsze działanie naruszałoby regulamin dostawcy albo zagrażałoby bezpieczeństwu danych.",
+    ],
+  },
+  {
+    title: "Dane Użytkownika i kopie zapasowe",
+    blocks: [
+      "Dane operacyjne (zamówienia, przesyłki, magazyn, faktury) są przechowywane lokalnie na urządzeniu Użytkownika. Użytkownik pozostaje ich administratorem i dysponentem.",
+      "Użytkownik jest odpowiedzialny za wykonywanie kopii zapasowych swojego urządzenia i lokalnej bazy danych. Usługodawca nie prowadzi kopii zapasowych danych operacyjnych Użytkownika i nie odpowiada za ich utratę wynikającą z awarii, uszkodzenia lub utraty urządzenia Użytkownika.",
+      "Przed wykonaniem operacji wysyłkowej, magazynowej, księgowej lub sprzedażowej Użytkownik powinien zweryfikować dane widoczne w Aplikacji.",
+    ],
+  },
+  {
+    title: "Odpowiedzialność",
+    blocks: [
+      "Usługodawca zobowiązuje się do dołożenia należytej staranności w zapewnieniu ciągłości działania Usługi. Usługodawca nie gwarantuje jednak nieprzerwanego i wolnego od błędów działania Aplikacji, w szczególności w zakresie zależnym od dostawców zewnętrznych, dostawców infrastruktury oraz od urządzenia i sieci Użytkownika.",
+      "Usługodawca może wprowadzać przerwy techniczne niezbędne do konserwacji, aktualizacji lub zapewnienia bezpieczeństwa Usługi, informując o planowanych przerwach w miarę możliwości z wyprzedzeniem.",
+      "Usługodawca nie ponosi odpowiedzialności za skutki decyzji handlowych Użytkownika, błędy w danych wprowadzonych przez Użytkownika, treść dokumentów wystawionych przy użyciu Aplikacji ani za rozliczenia podatkowe Użytkownika.",
+      "W stosunku do Użytkowników niebędących konsumentami odpowiedzialność Usługodawcy z tytułu umowy jest ograniczona do wysokości opłat uiszczonych przez Użytkownika w okresie 12 miesięcy poprzedzających zdarzenie i nie obejmuje utraconych korzyści. Ograniczenie nie ma zastosowania do szkód wyrządzonych umyślnie.",
+      "Powyższe ograniczenia nie wyłączają ani nie ograniczają uprawnień konsumenta oraz osoby fizycznej zawierającej umowę bezpośrednio związaną z jej działalnością gospodarczą, gdy umowa nie ma dla niej charakteru zawodowego, wynikających z bezwzględnie obowiązujących przepisów prawa.",
+    ],
+  },
+  {
+    title: "Reklamacje",
+    blocks: [
+      `Reklamacje dotyczące działania Aplikacji, Usługi lub płatności można składać na adres ${mail} albo przez <a class="text-brand-300 hover:text-white" href="/kontakt">formularz kontaktowy</a>.`,
+      "Reklamacja powinna zawierać dane umożliwiające kontakt, opis nieprawidłowości, datę jej wystąpienia oraz oczekiwany sposób rozpatrzenia.",
+      "Usługodawca rozpatruje reklamację w terminie 14 dni od jej otrzymania i informuje o wyniku na adres e-mail, z którego zgłoszenie zostało wysłane.",
+    ],
+  },
+  {
+    title: "Odstąpienie od umowy",
+    blocks: [
+      "Konsument oraz osoba fizyczna zawierająca umowę bezpośrednio związaną z jej działalnością gospodarczą, gdy umowa nie ma dla niej charakteru zawodowego, może odstąpić od umowy zawartej na odległość w terminie 14 dni bez podania przyczyny.",
+      `Oświadczenie o odstąpieniu wystarczy przesłać na adres ${mail} przed upływem terminu.`,
+      "Prawo odstąpienia nie przysługuje w odniesieniu do umowy o dostarczanie treści cyfrowych niedostarczanych na nośniku materialnym, za które konsument jest zobowiązany do zapłaty ceny, jeżeli spełnianie świadczenia rozpoczęło się za wyraźną i uprzednią zgodą konsumenta, który został poinformowany przed rozpoczęciem świadczenia o utracie prawa odstąpienia i przyjął to do wiadomości.",
+      "Okres próbny jest bezpłatny — rezygnacja w jego trakcie nie wiąże się z żadnymi kosztami.",
+    ],
+  },
+  {
+    title: "Rozwiązanie umowy i blokada Konta",
+    blocks: [
+      "Użytkownik może w każdej chwili zrezygnować z Usługi, rezygnując z odnowienia abonamentu albo zgłaszając żądanie usunięcia Konta. Rezygnacja jest skuteczna na koniec opłaconego okresu rozliczeniowego.",
+      "Usługodawca może wypowiedzieć umowę z zachowaniem 30-dniowego okresu wypowiedzenia, zwracając opłatę za niewykorzystany okres.",
+      "Usługodawca może zablokować Konto i wypowiedzieć umowę ze skutkiem natychmiastowym, gdy Użytkownik: narusza ograniczenia licencyjne, obchodzi zabezpieczenia lub limity, wykorzystuje Aplikację niezgodnie z prawem, udostępnia Konto osobom trzecim, zalega z płatnością powyżej 14 dni albo działa na szkodę Usługodawcy lub innych Użytkowników.",
+      "O blokadzie Usługodawca informuje na adres e-mail przypisany do Konta wraz z podaniem przyczyny. Użytkownik może odwołać się od blokady w trybie reklamacyjnym.",
+    ],
+  },
+  {
+    title: "Własność intelektualna",
+    blocks: [
+      "Nazwa Paczkowo, logotyp, layout strony, treści, grafiki i dokumentacja są chronione prawem i stanowią własność Usługodawcy lub są wykorzystywane na podstawie odpowiednich uprawnień.",
+      "Korzystanie z tych materiałów w zakresie wykraczającym poza dozwolony użytek osobisty wymaga uprzedniej pisemnej zgody Usługodawcy.",
+      "Znaki towarowe podmiotów trzecich (m.in. Allegro, Erli, InPost) należą do ich właścicieli i są używane wyłącznie w celu informacyjnym — dla oznaczenia zakresu Integracji. Nie oznacza to powiązania kapitałowego ani partnerstwa, o ile nie wskazano inaczej.",
+      "Jeżeli Użytkownik prześle Usługodawcy sugestie, pomysły lub uwagi dotyczące rozwoju Aplikacji, Usługodawca może z nich korzystać nieodpłatnie i bez ograniczeń, bez obowiązku ich zachowania w poufności.",
+    ],
+  },
+  {
+    title: "Dane osobowe",
+    blocks: [
+      `Zasady przetwarzania danych osobowych opisuje <a class="text-brand-300 hover:text-white" href="/polityka-prywatnosci">Polityka prywatności</a>, stanowiąca integralną część Warunków.`,
+      "Jeżeli w związku z korzystaniem z Aplikacji Usługodawca przetwarza dane osobowe, których administratorem jest Użytkownik, przetwarzanie odbywa się wyłącznie na udokumentowane polecenie Użytkownika i w zakresie niezbędnym do świadczenia Usługi.",
+    ],
+  },
+  {
+    title: "Zmiana Warunków",
+    blocks: [
+      "Usługodawca może zmienić Warunki z ważnych przyczyn, takich jak zmiana przepisów prawa, zmiana zakresu lub sposobu świadczenia Usługi, zmiana warunków współpracy z dostawcami zewnętrznymi albo względy bezpieczeństwa.",
+      "O zmianie Użytkownik zostanie poinformowany na adres e-mail przypisany do Konta lub komunikatem w Aplikacji, co najmniej 14 dni przed wejściem zmiany w życie.",
+      "Brak akceptacji nowych Warunków uprawnia Użytkownika do wypowiedzenia umowy przed dniem ich wejścia w życie. Dalsze korzystanie z Aplikacji po tej dacie oznacza akceptację zmian.",
+      "Aktualna wersja Warunków jest zawsze dostępna na tej stronie wraz z datą ostatniej aktualizacji.",
+    ],
+  },
+  {
+    title: "Prawo właściwe i spory",
+    blocks: [
+      "W sprawach nieuregulowanych Warunkami zastosowanie mają przepisy prawa polskiego, w szczególności Kodeksu cywilnego, ustawy o prawie autorskim i prawach pokrewnych, ustawy o świadczeniu usług drogą elektroniczną oraz ustawy o prawach konsumenta.",
+      "Spory z Użytkownikami niebędącymi konsumentami rozstrzyga sąd właściwy dla siedziby Usługodawcy.",
+      "Konsument może skorzystać z pozasądowych sposobów rozpatrywania reklamacji i dochodzenia roszczeń, w tym z platformy internetowego rozstrzygania sporów (ODR) prowadzonej przez Komisję Europejską. Skorzystanie z nich jest dobrowolne.",
+    ],
+  },
+  {
+    title: "Postanowienia końcowe i kontakt",
+    blocks: [
+      "Jeżeli którekolwiek postanowienie Warunków okaże się nieważne lub bezskuteczne, pozostałe postanowienia zachowują moc, a postanowienie nieważne zastępuje się postanowieniem najbliższym jego celowi gospodarczemu.",
+      "Nieskorzystanie przez Usługodawcę z przysługującego mu uprawnienia nie oznacza zrzeczenia się tego uprawnienia.",
+      "Użytkownik nie może przenieść praw i obowiązków wynikających z umowy na osobę trzecią bez uprzedniej pisemnej zgody Usługodawcy.",
+      `Kontakt w sprawach dotyczących Warunków: ${mail}. Dane Usługodawcy: <strong>${companyLine}</strong>.`,
+    ],
+  },
 ];
 ---
-<Layout title="Warunki korzystania — Paczkowo"><LegalDocument title="Warunki korzystania" lead="Zasady korzystania ze strony i aplikacji Paczkowo." updated="23 lipca 2026" sections={sections} /></Layout>
+
+<Layout
+  title="Warunki korzystania — Paczkowo"
+  description="Warunki korzystania z aplikacji Paczkowo i strony paczkowo.net: licencja, opłaty, integracje, odpowiedzialność i zasady rozwiązania umowy."
+>
+  <LegalDocument
+    title="Warunki korzystania"
+    lead="Zasady korzystania z aplikacji Paczkowo oraz ze strony paczkowo.net — licencja, opłaty, integracje i odpowiedzialność stron."
+    updated={company.updated}
+    sections={sections}
+  />
+</Layout>

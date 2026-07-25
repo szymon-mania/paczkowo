@@ -1,7 +1,7 @@
 // StockCore — prosty magazyn. Produkt = jedna liczba „na stanie" (qty).
 // Stan schodzi sam przy wysyłce, rośnie przy dostawie/korekcie. Katalog zaciągasz
 // z ofert Allegro/Erli i z historii zamówień — bez ręcznego wpisywania.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./serverStatus";
 
 export type StockProduct = {
   id: number;

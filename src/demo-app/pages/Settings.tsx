@@ -46,7 +46,6 @@ export default function Settings({ license, email, integrationsCount, theme, set
   const [newPw2, setNewPw2] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  const [confirmLogout, setConfirmLogout] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [installPct, setInstallPct] = useState(0);
   const [installErr, setInstallErr] = useState<string | null>(null);
@@ -194,21 +193,8 @@ export default function Settings({ license, email, integrationsCount, theme, set
           </button>
         </Card>
 
-        <button type="button" onClick={() => setConfirmLogout(true)} className="btn" style={{ color: "#f4515b", border: "1px solid color-mix(in srgb, #f4515b 40%, transparent)" }}>{t(T.menu_logout)}</button>
+        <button type="button" onClick={onLogout} className="btn" style={{ color: "#f4515b", border: "1px solid color-mix(in srgb, #f4515b 40%, transparent)" }}>{t(T.menu_logout)}</button>
       </div>
-
-      {confirmLogout && (
-        <div onClick={() => setConfirmLogout(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div onClick={(e) => e.stopPropagation()} className="card elev-lg" style={{ width: 360, padding: 24 }}>
-            <div style={{ fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 16, marginBottom: 8 }}>{t(T.set_logout_confirm_title)}</div>
-            <div className="text-muted" style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 18 }}>{t(T.set_logout_confirm_body)}</div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmLogout(false)} className="btn btn-secondary">{t(T.common_cancel)}</button>
-              <button onClick={() => { setConfirmLogout(false); onLogout(); }} className="btn" style={{ background: "#dc2626", color: "#fff", border: "none" }}>{t(T.menu_logout)}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

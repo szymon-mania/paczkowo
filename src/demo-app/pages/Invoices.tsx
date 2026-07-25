@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/serverStatus";
 import { useEffect, useMemo, useState } from "react";
 import { CircleDollarSign, Download, ExternalLink, Eye, FilePenLine, Plus, Printer, RefreshCw, Search, Send, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 

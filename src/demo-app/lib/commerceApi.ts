@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./serverStatus";
 import type { Order } from "./types";
 
 export type OfferStatus = "DRAFT" | "READY" | "ACTIVE" | "PAUSED" | "ENDED" | "ERROR";
@@ -134,15 +134,30 @@ export type ReturnResolution = "PENDING" | "REFUND" | "PARTIAL_REFUND" | "REPLAC
 export type RefundStatus = "NOT_REQUIRED" | "PENDING" | "COMPLETED" | "FAILED";
 export type RestockPolicy = "INSPECT" | "RESTOCK" | "QUARANTINE" | "DISPOSE" | "RETURN_TO_SUPPLIER";
 export type ReturnItem = { id?: number; orderItemId?: string; sku?: string; name: string; imageUrl?: string; quantity: number; itemCondition: string; resolution: ReturnResolution };
+/** Konto kupującego — przy pobraniu/przelewie zwrot idzie przelewem, nie przez API. */
+export type RefundBankAccount = { owner?: string; accountNumber?: string; iban?: string; swift?: string; address?: string };
+export type CommissionClaimStatus = "IN_PROGRESS" | "GRANTED" | "REJECTED" | "CANCELLED";
 export type ReturnCase = {
   id: number; sourcePlatform: string; accountName?: string; externalReturnId?: string;
   externalStatus?: string; paymentId?: string; refundId?: string; refundError?: string;
+  refundBankAccount?: RefundBankAccount; rejectionCode?: string; rejectionReason?: string;
+  commissionClaimIds?: string; commissionClaimStatus?: CommissionClaimStatus;
+  returnLabelPath?: string; returnLabelTracking?: string; returnLabelCarrier?: string;
   orderDbId?: number; externalOrderId?: string; customerName: string; customerEmail?: string;
   returnType: ReturnType; status: ReturnStatus; resolution: ReturnResolution; reasonCode: string;
   reasonDetails?: string; requestedAt: string; refundDueAt?: string; receivedAt?: string;
   refundedAt?: string; refundStatus: RefundStatus; refundAmount: number; currency: string;
   returnCarrier?: string; trackingNumber?: string; restockPolicy: RestockPolicy; notes?: string;
   revision: number; createdAt: string; updatedAt: string; items: ReturnItem[];
+};
+export type ReturnSyncResult = { accountsSynced: number; fetched: number; saved: number; pendingRefunds: number };
+export type ReturnLabelAddress = {
+  name?: string; companyName?: string; email?: string; phone?: string;
+  street?: string; city?: string; postCode?: string; countryCode?: string; targetPoint?: string;
+};
+export type CreateReturnLabelInput = {
+  returnId: number; receiver: ReturnLabelAddress; sender?: ReturnLabelAddress;
+  template?: string; lengthCm?: number; widthCm?: number; heightCm?: number; weightKg?: number; comments?: string;
 };
 export type SaveReturn = Omit<ReturnCase, "id" | "sourcePlatform" | "accountName" | "externalReturnId" | "status" | "refundStatus" | "receivedAt" | "refundedAt" | "revision" | "createdAt" | "updatedAt"> & {
   id?: number; expectedRevision?: number;
@@ -201,6 +216,12 @@ export const listReturns = () => invoke<ReturnCase[]>("list_returns");
 export const saveReturn = (input: SaveReturn) => invoke<number>("save_return", { input });
 export const transitionReturn = (id: number, status: ReturnStatus) => invoke<void>("transition_return", { id, status });
 export const deleteReturn = (id: number) => invoke<void>("delete_return", { id });
-export const syncMarketplaceReturns = () => invoke<{ accountsSynced: number; fetched: number; saved: number; pendingRefunds: number }>("sync_marketplace_returns");
+export const syncMarketplaceReturns = () => invoke<ReturnSyncResult>("sync_marketplace_returns");
+export const syncMarketplaceReturnPlatform = (platform: string, account?: string) => invoke<ReturnSyncResult>("sync_marketplace_return_platform", { platform, account });
 export const executeReturnRefund = (id: number) => invoke<string>("execute_return_refund", { id });
 export const rejectMarketplaceReturn = (id: number, code: string, reason?: string) => invoke<void>("reject_marketplace_return", { input: { id, code, reason } });
+/** Rabat transakcyjny — wniosek o zwrot prowizji za zwrócone pozycje (Allegro, 45 dni). */
+export const claimReturnCommission = (id: number) => invoke<string>("claim_return_commission", { id });
+export const refreshReturnCommission = (id: number) => invoke<CommissionClaimStatus>("refresh_return_commission", { id });
+/** Etykieta zwrotna z własnej umowy InPost (ShipX) — kupujący nadaje, sprzedawca płaci. */
+export const createReturnLabel = (input: CreateReturnLabelInput) => invoke<{ trackingNumber: string; labelPath: string; carrier: string }>("create_return_label", { request: input });

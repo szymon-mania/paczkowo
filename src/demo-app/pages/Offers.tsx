@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, CirclePause, CircleStop, Pencil, Play, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { CheckCircle2, CirclePause, CircleStop, DownloadCloud, Pencil, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import AllegroOfferEditor from "../components/AllegroOfferEditor";
 import InpostMerchantOfferEditor from "../components/InpostMerchantOfferEditor";
 import ErliOfferEditor from "../components/ErliOfferEditor";
 import { CommerceHeader, CommerceModal, CommercePage, CommercePagination, EmptyTable, Field, KpiStrip, StatusPill } from "../components/CommerceUi";
+import { IntegrationImportList, platformLabel } from "../components/IntegrationImport";
+import { AccountFilterMulti, type ChannelOption } from "../components/ListFilters";
+import { SyncProgressPanel, SyncSummaryBanner, type SyncSummary } from "../components/SyncStatus";
+import { consumeQuota, quotaState, refundQuota, QUOTA_LIMIT, QUOTA_WINDOW_MS } from "../lib/syncQuota";
 import { createMarketplaceOfferDraft, changeOfferStatus, deleteOffer, getMarketplaceOfferDetails, listOffers, pushMarketplaceOffer, saveMarketplaceOfferDetails, saveOffer, syncMarketplaceOfferPlatform, uploadMarketplaceOfferImage, type JsonObject, type Offer, type OfferDetails, type OfferListResponse, type OfferStatus, type OfferSyncResult, type SaveOffer } from "../lib/commerceApi";
 import { getIntegrations, type Integration } from "../lib/accountApi";
 import { formatCurrencyTotals } from "../lib/commerceFormat";
 import { T, translateMessage, useI18n } from "../lib/i18n";
-import { clearSyncProgress, OFFER_SYNC_PROGRESS_KEY, readSyncProgress, syncProgressPercent, writeSyncProgress, type SyncProgressState, type SyncProgressStep, type SyncStepStatus } from "../lib/syncProgress";
+import { classifyServerError } from "../lib/serverStatus";
+import { clearSyncProgress, OFFER_SYNC_PROGRESS_KEY, readSyncProgress, writeSyncProgress, type SyncProgressState, type SyncProgressStep, type SyncStepStatus } from "../lib/syncProgress";
+
+/** Zakres limitu pobrań ofert (klucz w localStorage). */
+const OFFER_IMPORT_SCOPE = "offers";
 
 // VAT column: pokaż tylko poprawne stawki (cyfra, cyfra z %, np. 0.23).
 // UNKNOWN / pusta / nierozpoznana wartość => "-".
@@ -22,23 +30,29 @@ const formatTaxRate = (raw: string): string => {
 
 const OFFER_SYNC_PLATFORMS = new Set(["allegro", "erli", "inpost_merchant"]);
 
-const LOGO_SOURCES: Record<string, string[]> = {
-  allegro: ["/logos/allegro.svg", "/logos/allegro.png"],
-  erli: ["/logos/erli.svg", "/logos/erli.png"],
-  inpost_merchant: ["/logos/inpost-merchant.svg", "/logos/inpost-merchant.png", "/logos/inpost_merchant.svg", "/logos/inpost_merchant.png", "/logos/inpost.svg", "/logos/inpost.png"],
-  inpost: ["/logos/inpost.svg", "/logos/inpost.png"],
-  amazon: ["/logos/amazon.svg", "/logos/amazon.png"],
-};
+/** Oferty bez konta (ręczne) mają pusty klucz — w filtrze potrzebują własnej wartości. */
+const MANUAL_ACCOUNT_KEY = "__manual";
+const accountFilterValues = (selected: Set<string>) =>
+  [...selected].map((value) => (value === MANUAL_ACCOUNT_KEY ? "" : value));
+/** Kolejność statusów jest stała — segmenty nie mogą znikać przy zawężeniu filtrów. */
+const STATUS_SEGMENTS: OfferStatus[] = ["DRAFT", "READY", "ACTIVE", "PAUSED", "ENDED", "ERROR"];
 
-function OfferPlatformLogo({ platform, label }: { platform: string; label: string }) {
-  const sources = LOGO_SOURCES[platform] ?? [`/logos/${platform}.svg`, `/logos/${platform}.png`];
-  const [index, setIndex] = useState(0);
-  const src = sources[index];
-  if (!src) {
-    return <span className="offer-filter-logo-fallback" title={label}>{label.charAt(0).toUpperCase()}</span>;
-  }
-  return <img className="offer-filter-logo" src={src} alt={label} title={label} onError={() => setIndex((value) => value + 1)} />;
+// ─── PODRĘCZNA PAMIĘĆ LISTY ───────────────────────────────────────────────────
+// Wejście na zakładkę pokazuje ostatni wynik od razu (bez spinnera); świeże dane
+// dociągają się w tle, a odpowiedź młodsza niż TTL nie generuje zapytania w ogóle.
+const EMPTY_OFFERS: OfferListResponse = { offers: [], total: 0, page: 1, pageSize: 20, platformFacets: [], accountFacets: [], statusCounts: {}, activeStockValues: [] };
+const OFFERS_TTL_MS = 60_000;
+const OFFERS_CACHE_LIMIT = 12;
+type OffersView = { page: number; pageSize: number; search: string; status: OfferStatus | "ALL"; accounts: string[] };
+const DEFAULT_VIEW: OffersView = { page: 1, pageSize: 20, search: "", status: "ALL", accounts: [] };
+const offersQueryKey = (view: OffersView) => JSON.stringify([view.page, view.pageSize, view.search.trim(), view.status, [...view.accounts].sort()]);
+const offersCache = new Map<string, { data: OfferListResponse; at: number }>();
+function rememberOffers(key: string, data: OfferListResponse) {
+  offersCache.delete(key);
+  offersCache.set(key, { data, at: Date.now() });
+  while (offersCache.size > OFFERS_CACHE_LIMIT) offersCache.delete(offersCache.keys().next().value!);
 }
+let integrationsCache: Integration[] | null = null;
 
 const emptyOfferSyncResult = (): OfferSyncResult => ({ accountsSynced: 0, fetched: 0, saved: 0, conflicts: 0, failedPlatforms: [] });
 const mergeOfferSyncResult = (left: OfferSyncResult, right: OfferSyncResult): OfferSyncResult => ({
@@ -49,10 +63,6 @@ const mergeOfferSyncResult = (left: OfferSyncResult, right: OfferSyncResult): Of
   failedPlatforms: [...left.failedPlatforms, ...right.failedPlatforms],
 });
 
-function platformLabel(platform: string) {
-  return platform === "inpost_merchant" ? "InPost Merchant" : platform === "inpost" ? "InPost" : platform === "allegro" ? "Allegro" : platform === "erli" ? "ERLI" : platform;
-}
-
 function createOfferSyncSteps(items: Integration[]): SyncProgressStep[] {
   return items
     .filter((item) => OFFER_SYNC_PLATFORMS.has(item.platform) && item.status !== "ERROR")
@@ -62,17 +72,11 @@ function createOfferSyncSteps(items: Integration[]): SyncProgressStep[] {
         key: `${item.platform}::${accountKey || item.id}`,
         platform: item.platform,
         accountKey,
+        accountName: item.accountName,
         label: `${item.accountName} · ${platformLabel(item.platform)}`,
         status: "pending" as const,
       };
     });
-}
-
-function offerSyncStatusLabel(status: SyncStepStatus, lang: string) {
-  if (lang === "pl") {
-    return status === "active" ? "W toku" : status === "done" ? "Gotowe" : status === "error" ? "Błąd" : "Czeka";
-  }
-  return status === "active" ? "In progress" : status === "done" ? "Done" : status === "error" ? "Error" : "Waiting";
 }
 
 function offerStepDetail(result: OfferSyncResult, lang: string) {
@@ -80,53 +84,25 @@ function offerStepDetail(result: OfferSyncResult, lang: string) {
   return result.conflicts > 0 ? `${base} · ${lang === "pl" ? "konfl." : "conf."} ${result.conflicts}` : base;
 }
 
-function OfferSyncProgress({ progress, lang }: { progress: SyncProgressState; lang: string }) {
-  const active = progress.steps.find((step) => step.status === "active");
-  const finished = progress.steps.filter((step) => step.status === "done" || step.status === "error").length;
-  const numbers = [
-    `${finished} / ${progress.steps.length}`,
-    lang === "pl" ? `pobrano ${progress.fetched}` : `fetched ${progress.fetched}`,
-    lang === "pl" ? `zapisano ${progress.saved}` : `saved ${progress.saved}`,
-    lang === "pl" ? `konflikty ${progress.conflicts ?? 0}` : `conflicts ${progress.conflicts ?? 0}`,
-  ];
-  const context = active
-    ? `${lang === "pl" ? "Pobieram" : "Fetching"}: ${active.label}`
-    : progress.done
-      ? (lang === "pl" ? "Zakończono" : "Done")
-      : progress.title;
-  const subtitle = `${context} · ${numbers.join(" · ")}`;
-  return (
-    <div className="commerce-sync-progress" role="status" aria-live="polite">
-      <div><strong>{progress.title}</strong><span>{subtitle}</span></div>
-      <div className="commerce-sync-progress-track"><span style={{ width: `${syncProgressPercent(progress)}%` }} /></div>
-      <div className="commerce-sync-platforms">
-        {progress.steps.map((step) => (
-          <span className={`commerce-sync-platform ${step.status}`} key={step.key} title={step.detail}>
-            <span className="commerce-sync-dot" />
-            <strong>{step.label}</strong>
-            <small>{step.detail ? `${offerSyncStatusLabel(step.status, lang)} · ${step.detail}` : offerSyncStatusLabel(step.status, lang)}</small>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function Offers() {
   const { t, lang } = useI18n();
   const locale = lang === "pl" ? "pl-PL" : "en-GB";
-  const [result, setResult] = useState<OfferListResponse>({ offers: [], total: 0, page: 1, pageSize: 20, platformFacets: [], accountFacets: [], statusCounts: {}, activeStockValues: [] });
+  const [result, setResult] = useState<OfferListResponse>(() => offersCache.get(offersQueryKey(DEFAULT_VIEW))?.data ?? EMPTY_OFFERS);
   const rows = result.offers;
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [integrations, setIntegrations] = useState<Integration[]>(() => integrationsCache ?? []);
+  const [loading, setLoading] = useState(() => !offersCache.has(offersQueryKey(DEFAULT_VIEW)));
   const [busy, setBusy] = useState(false);
   const [syncingOffers, setSyncingOffers] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(() => readSyncProgress(OFFER_SYNC_PROGRESS_KEY));
+  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [activeImportKey, setActiveImportKey] = useState<string | null>(null);
+  // Zużycie limitu trzymane jest w localStorage — ta wersja wymusza przeliczenie widoku.
+  const [quotaVersion, setQuotaVersion] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<OfferStatus | "ALL">("ALL");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selPlatforms, setSelPlatforms] = useState<Set<string>>(new Set());
+  // Filtr kont: wielokrotny wybór (pusty zbiór = wszystkie konta).
   const [selAccounts, setSelAccounts] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -140,13 +116,20 @@ export default function Offers() {
   const [endingOffer, setEndingOffer] = useState<Offer | null>(null);
   const [deletingOffer, setDeletingOffer] = useState<Offer | null>(null);
 
-  const reload = () => setReloadVersion((value) => value + 1);
-  const loadIntegrations = () => getIntegrations().then(setIntegrations).catch(() => setIntegrations([]));
+  // Zmiana danych (zapis/import/usunięcie) unieważnia cache — inaczej wróciłby stary wynik.
+  const reload = () => { offersCache.clear(); setReloadVersion((value) => value + 1); };
+  const loadIntegrations = () => getIntegrations()
+    .then((list) => { integrationsCache = list; setIntegrations(list); })
+    .catch(() => setIntegrations(integrationsCache ?? []));
+  const queryKey = offersQueryKey({ page, pageSize, search, status, accounts: [...selAccounts] });
   useEffect(() => {
     let cancelled = false;
+    const cached = offersCache.get(queryKey);
+    if (cached) { setResult(cached.data); setLoading(false); }
+    if (cached && Date.now() - cached.at < OFFERS_TTL_MS) return;
     const timer = window.setTimeout(() => {
-      setLoading(true);
-      listOffers({ page, pageSize, search, status: status === "ALL" ? null : status, platforms: [...selPlatforms], accounts: [...selAccounts] })
+      if (!cached) setLoading(true);
+      listOffers({ page, pageSize, search, status: status === "ALL" ? null : status, platforms: [], accounts: accountFilterValues(selAccounts) })
         .then((next) => {
           if (cancelled) return;
           const maxPage = Math.max(1, Math.ceil(next.total / pageSize));
@@ -154,25 +137,20 @@ export default function Offers() {
             setPage(maxPage);
             return;
           }
+          rememberOffers(queryKey, next);
           setResult(next);
         })
         .catch((value) => { if (!cancelled) setError(translateMessage(value, t)); })
         .finally(() => { if (!cancelled) setLoading(false); });
     }, search.trim() ? 250 : 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [page, pageSize, search, status, selPlatforms, selAccounts, reloadVersion]);
+  }, [queryKey, reloadVersion]);
   useEffect(() => {
     void loadIntegrations();
   }, []);
 
-  // Fasety filtrów (platforma / konto) z licznikami — jak w Dashboardzie.
-  const activeFilters = selPlatforms.size + selAccounts.size;
-  const toggleInSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) => {
-    setPage(1);
-    setter((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-  };
-
   const count = (value: OfferStatus) => result.statusCounts[value] ?? 0;
+  const totalOffers = Object.values(result.statusCounts).reduce((sum, value) => sum + (value ?? 0), 0);
   const stockValue = formatCurrencyTotals(result.activeStockValues, locale, (row) => row.amount, (row) => row.currency);
 
   const editManual = (offer: Offer) => setEditing({
@@ -277,23 +255,25 @@ export default function Offers() {
     finally { setBusy(false); }
   };
 
-  const sync = async () => {
-    setBusy(true); setSyncingOffers(true); setError(""); setNotice(""); setNoticeWarning(false);
-    try {
-      const freshIntegrations = await getIntegrations().catch(() => integrations);
-      setIntegrations(freshIntegrations);
-      const steps = createOfferSyncSteps(freshIntegrations);
-      if (steps.length === 0) {
-        clearSyncProgress(OFFER_SYNC_PROGRESS_KEY);
-        setSyncProgress(null);
-        setError(lang === "pl" ? "Brak kont do synchronizacji ofert." : "No accounts available for offer sync.");
-        return;
-      }
+  // Pobranie ofert z wybranych kont. Każde konto kosztuje jedno „użycie" z limitu —
+  // nieudana próba jest zwracana, żeby błąd integracji nie zjadał puli użytkownika.
+  const runImport = async (accounts: Integration[]) => {
+    const steps = createOfferSyncSteps(accounts).filter((step) => quotaState(OFFER_IMPORT_SCOPE, step.accountKey || "").remaining > 0);
+    if (steps.length === 0) return;
 
+    const finishImport = (summary: SyncSummary | null) => {
+      clearSyncProgress(OFFER_SYNC_PROGRESS_KEY);
+      setSyncProgress(null);
+      setSyncSummary(summary);
+      setQuotaVersion((value) => value + 1);
+    };
+
+    setBusy(true); setSyncingOffers(true); setError(""); setNotice(""); setNoticeWarning(false); setSyncSummary(null);
+    try {
       let result = emptyOfferSyncResult();
       const failures: string[] = [];
       let progress: SyncProgressState = {
-        title: t(T.offer_sync),
+        title: t(T.sync_offers_title),
         startedAt: Date.now(),
         updatedAt: Date.now(),
         steps,
@@ -316,57 +296,66 @@ export default function Offers() {
 
       publishProgress(progress);
       for (const step of steps) {
+        const account = step.accountKey || "";
+        if (!consumeQuota(OFFER_IMPORT_SCOPE, account)) continue;
+        setActiveImportKey(account);
         markStep(step.key, "active");
         try {
           const platformResult = await syncMarketplaceOfferPlatform(step.platform, step.accountKey);
           result = mergeOfferSyncResult(result, platformResult);
-          if (platformResult.failedPlatforms.length > 0) {
+          const failed = platformResult.failedPlatforms.length > 0;
+          if (failed) {
+            refundQuota(OFFER_IMPORT_SCOPE, account);
             failures.push(`${step.label}: ${platformResult.failedPlatforms.map(platformLabel).join(", ")}`);
-            publishProgress({
-              ...progress,
-              fetched: result.fetched,
-              saved: result.saved,
-              accountsSynced: result.accountsSynced,
-              conflicts: result.conflicts,
-              steps: progress.steps.map((item) => item.key === step.key ? { ...item, status: "error", detail: offerStepDetail(platformResult, lang) } : item),
-            });
-          } else {
-            publishProgress({
-              ...progress,
-              fetched: result.fetched,
-              saved: result.saved,
-              accountsSynced: result.accountsSynced,
-              conflicts: result.conflicts,
-              steps: progress.steps.map((item) => item.key === step.key ? { ...item, status: "done", detail: offerStepDetail(platformResult, lang) } : item),
-            });
           }
+          publishProgress({
+            ...progress,
+            fetched: result.fetched,
+            saved: result.saved,
+            accountsSynced: result.accountsSynced,
+            conflicts: result.conflicts,
+            steps: progress.steps.map((item) => item.key === step.key
+              ? { ...item, status: failed ? "error" : "done", detail: offerStepDetail(platformResult, lang) }
+              : item),
+          });
         } catch (value) {
+          refundQuota(OFFER_IMPORT_SCOPE, account);
+          // Padnięty serwer obsługuje ekran awarii (App.tsx / onServerSignal) — nie
+          // dobijamy kolejnych kont ani nie pokazujemy błędów, których user nie naprawi.
+          if (classifyServerError(value) === "unavailable") {
+            finishImport(null);
+            return;
+          }
           const detail = translateMessage(value, t);
           failures.push(`${step.label}: ${detail}`);
           markStep(step.key, "error", detail);
         }
       }
-      publishProgress({ ...progress, done: true });
+
       const failedPlatforms = [...new Set([...result.failedPlatforms.map(platformLabel), ...failures])];
-      if (failedPlatforms.length > 0) {
-        setNoticeWarning(true);
-        setError(failedPlatforms.length === steps.length
-          ? (lang === "pl" ? `Nie udało się odświeżyć kont: ${failedPlatforms.join(", ")}.` : `Could not refresh accounts: ${failedPlatforms.join(", ")}.`)
-          : t(T.offer_sync_partial, { platforms: failedPlatforms.join(", ") }));
-      } else {
-        setNotice(t(T.offer_sync_result).replace("{saved}", String(result.saved)).replace("{conflicts}", String(result.conflicts)));
-        const finishedSyncStartedAt = progress.startedAt;
-        window.setTimeout(() => {
-          setSyncProgress((current) => {
-            if (current?.startedAt !== finishedSyncStartedAt) return current;
-            clearSyncProgress(OFFER_SYNC_PROGRESS_KEY);
-            return null;
+      finishImport(failedPlatforms.length > 0
+        ? { ok: false, title: t(T.sync_failed_title), detail: failedPlatforms.join(" | "), at: Date.now() }
+        : {
+            ok: true,
+            title: t(T.sync_done_title),
+            detail: t(T.sync_done_detail, { accounts: steps.length, fetched: result.fetched, saved: result.saved }),
+            at: Date.now(),
           });
-        }, 8000);
-      }
       reload();
-    } catch (value) { setError(translateMessage(value, t)); }
-    finally { setSyncingOffers(false); setBusy(false); }
+    } catch (value) {
+      if (classifyServerError(value) === "unavailable") {
+        finishImport(null);
+        return;
+      }
+      finishImport({ ok: false, title: t(T.sync_failed_title), detail: translateMessage(value, t), at: Date.now() });
+    }
+    finally { setActiveImportKey(null); setSyncingOffers(false); setBusy(false); }
+  };
+
+  const importAll = async () => {
+    const fresh = await getIntegrations().catch(() => integrations);
+    setIntegrations(fresh);
+    await runImport(fresh.filter((item) => OFFER_SYNC_PLATFORMS.has(item.platform)));
   };
 
   const statusLabel = (value: OfferStatus) => t({ DRAFT: T.offer_status_draft, READY: T.offer_status_ready, ACTIVE: T.offer_status_active, PAUSED: T.offer_status_paused, ENDED: T.offer_status_ended, ERROR: T.offer_status_error }[value]);
@@ -376,8 +365,27 @@ export default function Offers() {
       : offer.syncStatus === "CONFLICT" ? t(T.offer_sync_conflict)
         : offer.syncStatus === "ERROR" ? t(T.offer_sync_error)
           : t(T.offer_sync_local);
+  const importAccounts = integrations.filter((integration) => OFFER_SYNC_PLATFORMS.has(integration.platform));
+  const importableNow = importAccounts.filter((integration) => integration.status !== "ERROR"
+    && quotaState(OFFER_IMPORT_SCOPE, integration.accountKey || integration.accountName).remaining > 0);
+  // „Pusty start" = brak ofert w ogóle (nie: pusty wynik filtrowania).
+  const nothingImportedYet = result.total === 0 && !search.trim() && status === "ALL" && selAccounts.size === 0;
   const accountLabelByKey = new Map(integrations.map((integration) => [integration.accountKey || integration.accountName, integration.accountName]));
+  const accountPlatformByKey = new Map(integrations.map((integration) => [integration.accountKey || integration.accountName, integration.platform]));
   const accountLabel = (key: string, label?: string) => label || accountLabelByKey.get(key) || key || t(T.offer_manual);
+  // Opcje filtra konta w formacie wspólnego selecta (logo platformy + nazwa konta).
+  const accountOptions: ChannelOption[] = result.accountFacets.map((facet) => {
+    const platforms = facet.platforms?.length ? facet.platforms : [accountPlatformByKey.get(facet.key)].filter(Boolean) as string[];
+    const manual = !facet.key;
+    return {
+      value: facet.key || MANUAL_ACCOUNT_KEY,
+      platform: manual ? "manual" : platforms[0] ?? "manual",
+      platformLabel: manual || !platforms.length ? t(T.offer_manual) : platforms.map(platformLabel).join(" · "),
+      accountName: facet.key,
+      accountDisplayName: manual ? "—" : accountLabel(facet.key, facet.label),
+      count: facet.count,
+    };
+  });
   const createSupportedPlatforms = new Set(["allegro", "inpost_merchant"]);
   const createSupportedIntegrations = integrations.filter((integration) => createSupportedPlatforms.has(integration.platform));
   const createUnsupportedIntegrations = integrations.filter((integration) => !createSupportedPlatforms.has(integration.platform));
@@ -393,10 +401,13 @@ export default function Offers() {
   return (
     <CommercePage>
       <CommerceHeader title={t(T.nav_offers)} subtitle={t(T.offer_subtitle)} action={<div className="commerce-header-actions">
-        <button type="button" className="btn btn-secondary ord-sync-button" disabled={busy} onClick={sync}><RefreshCw size={14} className={syncingOffers ? "spin" : ""} />{syncingOffers ? t(T.common_loading) : t(T.offer_sync)}</button>
+        <button type="button" className="btn btn-secondary ord-sync-button" disabled={busy} onClick={() => setImportOpen(true)}>
+          <DownloadCloud size={15} className={syncingOffers ? "spin" : ""} />{t(T.offer_import_open)}
+        </button>
         <button type="button" className="btn btn-primary" onClick={() => setNewOfferOpen(true)}><Plus size={15} />{t(T.offer_add)}</button>
+        {syncProgress && <SyncProgressPanel progress={syncProgress} />}
       </div>} />
-      {syncProgress && <OfferSyncProgress progress={syncProgress} lang={lang} />}
+      {syncSummary && <SyncSummaryBanner summary={syncSummary} onDismiss={() => setSyncSummary(null)} />}
       <KpiStrip items={[
         { label: t(T.offer_kpi_all), value: Object.values(result.statusCounts).reduce((sum, value) => sum + (value ?? 0), 0) },
         { label: t(T.offer_kpi_active), value: count("ACTIVE"), tone: "good" },
@@ -405,70 +416,73 @@ export default function Offers() {
       ]} />
       {error && <div className="commerce-alert danger">{error}</div>}
       {notice && <div className={`commerce-alert ${noticeWarning ? "warn" : "good"}`}>{notice}</div>}
-      <section className="commerce-toolbar">
-        <div className="commerce-search"><Search size={15} /><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t(T.offer_search)} /></div>
-        <div className="seg" role="group">
-          {(["ALL", "DRAFT", "READY", "ACTIVE", "PAUSED", "ENDED"] as const).map((value) => (
-            <button type="button" key={value} className={`commerce-seg-btn${status === value ? " active" : ""}`} onClick={() => { setStatus(value); setPage(1); }}>
-              {value === "ALL" ? t(T.common_all) : statusLabel(value)}
-            </button>
-          ))}
+      {/* Filtry: szukaj + status + konto — układ wspólny z Zamówieniami/Wysyłką */}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
+        <div className="field" style={{ maxWidth: 280, flex: 1, minWidth: 200 }}>
+          <label htmlFor="offer-search">{t(T.common_search)}</label>
+          <input className="input" id="offer-search" placeholder={t(T.offer_search)} value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        {/* Filtry: platforma / konto — popover w stylu Dashboardu */}
-        <div style={{ position: "relative" }}>
-          <button type="button" className="btn btn-secondary" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}
-            style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <SlidersHorizontal size={13} />
-            {t(T.dash_filters)}
-            {activeFilters > 0 && <span className="seg-count">{activeFilters}</span>}
-          </button>
-          {filtersOpen && (
-            <>
-              <div onClick={() => setFiltersOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div className="card elev-sm" style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 41, width: 264, padding: 12, maxHeight: 400, overflowY: "auto" }}>
-                <div className="card-kicker" style={{ marginBottom: 4 }}>{t(T.int_col_platform)}</div>
-                {result.platformFacets.map((f) => (
-                  <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 2px", fontSize: 13, cursor: "pointer" }}>
-                    <input type="checkbox" checked={selPlatforms.has(f.key)} onChange={() => toggleInSet(setSelPlatforms, f.key)} />
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{platformLabel(f.key)}</span>
-                    <span className="text-muted" style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{f.count}</span>
-                  </label>
-                ))}
-                <div className="card-kicker" style={{ margin: "10px 0 4px" }}>{t(T.dash_by_account)}</div>
-                {result.accountFacets.map((f) => (
-                  <label key={f.key || "__manual"} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 2px", fontSize: 13, cursor: "pointer" }}>
-                    <input type="checkbox" checked={selAccounts.has(f.key)} onChange={() => toggleInSet(setSelAccounts, f.key)} />
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-                      {f.platforms?.slice(0, 3).map((platform) => <OfferPlatformLogo key={platform} platform={platform} label={platformLabel(platform)} />)}
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{accountLabel(f.key, f.label)}</span>
-                    </span>
-                    <span className="text-muted" style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{f.count}</span>
-                  </label>
-                ))}
-                {activeFilters > 0 && (
-                  <button type="button" className="btn btn-secondary" style={{ width: "100%", marginTop: 10, fontSize: 12 }}
-                    onClick={() => { setSelPlatforms(new Set()); setSelAccounts(new Set()); }}>
-                    {t(T.dash_clear_filters)}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+        <div className="field">
+          <label id="offer-status-label">{t(T.ord_status)}</label>
+          <div className="seg" role="radiogroup" aria-labelledby="offer-status-label">
+            {STATUS_SEGMENTS.map((value) => (
+              <label key={value} className="seg-opt">
+                <input type="radio" name="offerstatusf" checked={status === value} onChange={() => { setStatus(value); setPage(1); }} />
+                {statusLabel(value)}<span className="seg-count">{count(value)}</span>
+              </label>
+            ))}
+            <label className="seg-opt">
+              <input type="radio" name="offerstatusf" checked={status === "ALL"} onChange={() => { setStatus("ALL"); setPage(1); }} />
+              {t(T.common_all)}<span className="seg-count">{totalOffers}</span>
+            </label>
+          </div>
         </div>
-      </section>
-      <section className="commerce-table-wrap">
-        {loading ? <div className="commerce-loading">{t(T.common_loading)}</div> : rows.length === 0 ? <EmptyTable title={t(T.offer_empty)} detail={t(T.offer_empty_detail)} /> : (
-          <table className="table commerce-table">
-            <thead><tr><th>{t(T.offer_col_product)}</th><th>{t(T.offer_col_status)}</th><th>{t(T.offer_col_price)}</th><th>{t(T.offer_col_stock)}</th><th>{t(T.offer_col_tax)}</th><th>{t(T.offer_col_updated)}</th><th /></tr></thead>
+        <div className="field" style={{ maxWidth: 230 }}>
+          <label htmlFor="offer-account">{t(T.dash_by_account)}</label>
+          <AccountFilterMulti id="offer-account" selected={selAccounts} options={accountOptions} onChange={(next) => { setSelAccounts(next); setPage(1); }} />
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="card elev-sm" style={{ padding: 0, overflowX: "auto" }}>
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220 }}>
+            <div style={{ width: 24, height: 24, border: "3px solid var(--accent)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          </div>
+        ) : rows.length === 0 ? (
+          // Pusty start: zamiast samego komunikatu pokazujemy konta, z których można pobrać oferty.
+          nothingImportedYet ? (
+            <div className="offer-import-empty">
+              <header>
+                <strong>{t(T.offer_import_empty_title)}</strong>
+                <span>{t(T.offer_import_empty_detail)}</span>
+              </header>
+              <IntegrationImportList
+                accounts={importAccounts}
+                busy={busy}
+                activeKey={activeImportKey}
+                onImport={(account) => void runImport([account])}
+                locale={locale}
+                quotaVersion={quotaVersion}
+                scope={OFFER_IMPORT_SCOPE}
+                emptyLabel={t(T.offer_import_no_accounts)}
+                actionLabel={t(T.offer_import_account)}
+              />
+              <div className="offer-import-hint">{t(T.offer_import_quota_hint, { max: QUOTA_LIMIT, hours: QUOTA_WINDOW_MS / 3_600_000 })}</div>
+            </div>
+          ) : <EmptyTable title={t(T.offer_empty)} detail={t(T.offer_empty_detail)} />
+        ) : (
+          <table className="table commerce-table" style={{ fontSize: 14 }}>
+            <thead><tr><th style={{ paddingLeft: "var(--space-4)" }}>{t(T.offer_col_product)}</th><th>{t(T.offer_col_status)}</th><th className="ord-th-num">{t(T.offer_col_price)}</th><th className="ord-th-num">{t(T.offer_col_stock)}</th><th>{t(T.offer_col_tax)}</th><th>{t(T.offer_col_updated)}</th><th style={{ paddingRight: "var(--space-4)" }} /></tr></thead>
             <tbody>{rows.map((offer) => (
               <tr key={offer.id}>
                 <td><div className="offer-list-product">{offer.primaryImageUrl ? <img src={offer.primaryImageUrl} alt="" /> : <div className="offer-list-image-placeholder" />}<span><strong>{offer.title}</strong><span className="commerce-subline">SKU {offer.sku}{offer.brand ? ` · ${offer.brand}` : ""}</span></span></div></td>
                 <td><span title={offer.validationIssues.map((issue) => issue.code).join(", ") || undefined}><StatusPill tone={offer.syncStatus === "ERROR" || offer.syncStatus === "CONFLICT" ? "danger" : tone(offer.status)}>{statusLabel(offer.status)}</StatusPill></span><span className="commerce-subline">{offer.sourcePlatform !== "manual" ? `${platformLabel(offer.sourcePlatform)} · ${syncLabel(offer)}` : t(T.offer_manual)}</span></td>
-                <td className="commerce-num">{new Intl.NumberFormat(lang === "pl" ? "pl-PL" : "en-GB", { style: "currency", currency: offer.currency }).format(offer.priceAmount)}</td>
-                <td className="commerce-num">{offer.availableQuantity}</td>
+                <td className="ord-td-num">{new Intl.NumberFormat(lang === "pl" ? "pl-PL" : "en-GB", { style: "currency", currency: offer.currency }).format(offer.priceAmount)}</td>
+                <td className="ord-td-num">{offer.availableQuantity}</td>
                 <td>{formatTaxRate(offer.taxRate)}</td>
                 <td>{new Date(offer.updatedAt).toLocaleDateString(lang === "pl" ? "pl-PL" : "en-GB")}</td>
-                <td><div className="commerce-actions">
+                <td style={{ paddingRight: "var(--space-4)" }}><div className="commerce-actions" style={{ justifyContent: "flex-end" }}>
                   {offer.status !== "ENDED" && <button type="button" className="btn btn-ghost btn-icon" disabled={loadingDetailsId === offer.id} title={loadingDetailsId === offer.id ? t(T.offer_loading_details) : t(T.common_edit)} onClick={() => edit(offer)}><Pencil size={15} className={loadingDetailsId === offer.id ? "spin" : ""} /></button>}
                   {offer.status === "DRAFT" && <button type="button" className="btn btn-ghost btn-icon" title={t(T.offer_action_ready)} onClick={() => transition(offer.id, "READY")}><CheckCircle2 size={15} /></button>}
                   {(offer.status === "READY" || offer.status === "PAUSED") && <button type="button" className="btn btn-ghost btn-icon" title={t(T.offer_action_activate)} onClick={() => transition(offer.id, "ACTIVE")}><Play size={15} /></button>}
@@ -480,7 +494,7 @@ export default function Offers() {
             ))}</tbody>
           </table>
         )}
-      </section>
+      </div>
       {!loading && <CommercePagination page={page} pageSize={pageSize} total={result.total} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />}
 
       {editing && <CommerceModal title={editing.id ? t(T.offer_edit) : t(T.offer_add)} onClose={() => setEditing(null)} wide>
@@ -498,6 +512,29 @@ export default function Offers() {
           <Field label={t(T.offer_field_description)} span={2}><textarea className="input commerce-textarea" value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></Field>
         </div>
         <footer className="commerce-modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>{t(T.common_cancel)}</button><button type="button" className="btn btn-primary" disabled={busy || !canSave} onClick={submit}>{busy ? t(T.common_please_wait) : t(T.common_save)}</button></footer>
+      </CommerceModal>}
+      {importOpen && <CommerceModal title={t(T.offer_import_title)} onClose={() => setImportOpen(false)}>
+        <div className="offer-create-panel">
+          <p>{t(T.offer_import_subtitle)}</p>
+          <IntegrationImportList
+            accounts={importAccounts}
+            busy={busy}
+            activeKey={activeImportKey}
+            onImport={(account) => void runImport([account])}
+            locale={locale}
+            quotaVersion={quotaVersion}
+            scope={OFFER_IMPORT_SCOPE}
+            emptyLabel={t(T.offer_import_no_accounts)}
+            actionLabel={t(T.offer_import_account)}
+          />
+          <div className="offer-import-hint">{t(T.offer_import_quota_hint, { max: QUOTA_LIMIT, hours: QUOTA_WINDOW_MS / 3_600_000 })}</div>
+        </div>
+        <footer className="commerce-modal-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(false)}>{t(T.common_close)}</button>
+          <button type="button" className="btn btn-primary" disabled={busy || importableNow.length === 0} onClick={() => void importAll()}>
+            <DownloadCloud size={15} />{t(T.offer_import_all, { n: importableNow.length })}
+          </button>
+        </footer>
       </CommerceModal>}
       {newOfferOpen && <CommerceModal title={t(T.offer_choose_integration)} onClose={() => setNewOfferOpen(false)}>
         <div className="offer-create-panel">

@@ -1,14 +1,205 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import LegalDocument from "../components/LegalDocument.astro";
+import LegalDocument, { type LegalSection } from "../components/LegalDocument.astro";
+import { company, companyLine } from "../config/company";
 
-const sections = [
-  { title: "Formularz kontaktowy", paragraphs: ["Dane podane w formularzu kontaktowym - imię i nazwisko, adres e-mail, kategoria, temat oraz treść wiadomości - są wykorzystywane wyłącznie do obsługi zgłoszenia i udzielenia odpowiedzi.", "Formularz jest obsługiwany przez Web3Forms. Dane są przekazywane bezpośrednio do tego dostawcy w celu dostarczenia wiadomości na skrzynkę kontaktową Paczkowo. Serwery Web3Forms znajdują się w Stanach Zjednoczonych."] },
-  { title: "Administrator danych", paragraphs: ["Administratorem danych jest Solar Tech Damian Mania, ul. Skrajna 1, 64-610 Rogoźno, NIP: 787-191-82-71. Osobą prowadzącą działalność jest Damian Mania.", "W sprawach prywatności można kontaktować się pod adresem kontakt@paczkowo.net."] },
-  { title: "Zakres danych", paragraphs: ["W zależności od użytej funkcji możemy przetwarzać dane konta użytkownika, dane kontaktowe przesłane przez formularz oraz dane potrzebne do działania połączonych integracji.", "Dane z integracji są wykorzystywane wyłącznie do realizacji funkcji wybranych przez użytkownika, takich jak obsługa zamówień, wysyłka lub magazyn."] },
-  { title: "Cele i podstawa przetwarzania", paragraphs: ["Dane przetwarzamy w celu świadczenia usługi, obsługi kontaktu, bezpieczeństwa konta oraz realizacji obowiązków prawnych.", "Podstawą przetwarzania jest wykonanie umowy, uzasadniony interes administratora albo zgoda użytkownika, zależnie od charakteru danej czynności."] },
-  { title: "Odbiorcy i bezpieczeństwo", paragraphs: ["Dane mogą być przekazywane dostawcom infrastruktury i usług niezbędnych do działania Paczkowo, a także dostawcom integracji wskazanym przez użytkownika.", "Stosujemy środki techniczne i organizacyjne adekwatne do charakteru przetwarzanych danych. Dostęp do integracji wymaga autoryzacji użytkownika."] },
-  { title: "Prawa użytkownika", paragraphs: ["Użytkownik może żądać dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przeniesienia lub wnieść sprzeciw, jeżeli przepisy przewidują takie uprawnienie.", "Użytkownik ma również prawo złożyć skargę do właściwego organu nadzorczego."] },
+const mail = `<a class="text-brand-300 hover:text-white" href="mailto:${company.email}">${company.email}</a>`;
+const link = (href: string, label: string) =>
+  `<a class="text-brand-300 hover:text-white" href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+
+const sections: LegalSection[] = [
+  {
+    title: "Informacje ogólne",
+    blocks: [
+      `Niniejsza polityka dotyczy serwisu internetowego działającego pod adresem <strong>${company.site}</strong> oraz aplikacji desktopowej <strong>Paczkowo</strong>.`,
+      `Operatorem serwisu oraz Administratorem danych osobowych jest <strong>${companyLine}</strong>.`,
+      `Adres kontaktowy poczty elektronicznej Operatora: ${mail}.`,
+      "Operator jest Administratorem danych osobowych podanych dobrowolnie w serwisie oraz danych niezbędnych do prowadzenia konta i obsługi licencji w aplikacji.",
+      "Serwis pozyskuje informacje o użytkownikach w dwojaki sposób: poprzez dane wprowadzone dobrowolnie w formularzach oraz poprzez zapisywanie w urządzeniu końcowym plików cookie i danych w pamięci przeglądarki.",
+    ],
+  },
+  {
+    title: "Zakres przetwarzanych danych",
+    blocks: [
+      "W zależności od tego, z której funkcji korzystasz, przetwarzamy:",
+      [
+        "<strong>dane z formularza kontaktowego</strong> — imię i nazwisko, adres e-mail, kategoria zgłoszenia, temat oraz treść wiadomości;",
+        "<strong>dane konta w aplikacji</strong> — imię, nazwisko, adres e-mail, numer telefonu, opcjonalnie nazwa firmy, a także dane techniczne sesji i status licencji;",
+        "<strong>dane rozliczeniowe</strong> — informacje o wykupionym abonamencie i statusie płatności (danych karty płatniczej nie przechowujemy — obsługuje je operator płatności);",
+        "<strong>dane niezbędne do działania integracji</strong> — tokeny autoryzacyjne i identyfikatory kont w usługach, które sam podłączasz (m.in. Allegro, Erli, InPost);",
+        "<strong>dane techniczne</strong> — adres IP, oznaczenie czasu połączenia, informacje o przeglądarce i systemie, zapisywane w logach serwera.",
+      ],
+      "Podanie danych jest dobrowolne, ale niezbędne do obsługi zgłoszenia, założenia konta lub uruchomienia wybranej integracji.",
+    ],
+  },
+  {
+    title: "Cele i podstawy prawne przetwarzania",
+    blocks: [
+      [
+        "<strong>obsługa zapytań przez formularz</strong> — art. 6 ust. 1 lit. f RODO (uzasadniony interes: udzielenie odpowiedzi na zadane pytanie);",
+        "<strong>zawarcie i wykonanie umowy</strong> — prowadzenie konta, udostępnienie aplikacji, obsługa licencji, aktualizacji i pomocy technicznej — art. 6 ust. 1 lit. b RODO;",
+        "<strong>rozliczenia i obowiązki księgowe</strong> — art. 6 ust. 1 lit. c RODO;",
+        "<strong>bezpieczeństwo konta, wykrywanie nadużyć i zapewnienie ciągłości usługi</strong> — art. 6 ust. 1 lit. f RODO;",
+        "<strong>ustalenie, dochodzenie lub obrona roszczeń</strong> — art. 6 ust. 1 lit. f RODO;",
+        "<strong>przekazanie danych do usług zewnętrznych, które sam podłączasz</strong> — art. 6 ust. 1 lit. b RODO oraz udzielona przez Ciebie autoryzacja.",
+      ],
+    ],
+  },
+  {
+    title: "Formularz kontaktowy",
+    blocks: [
+      "Dane podane w formularzu kontaktowym wykorzystujemy wyłącznie do obsługi zgłoszenia i udzielenia odpowiedzi. Każdorazowo kontekst i opis formularza informuje, do czego on służy.",
+      "Formularz jest obsługiwany przez usługę <strong>Web3Forms</strong>. Dane z formularza są przekazywane bezpośrednio do tego dostawcy w celu dostarczenia wiadomości na skrzynkę kontaktową Paczkowo. Serwery Web3Forms znajdują się w Stanach Zjednoczonych.",
+      "Serwis może zapisać informacje o parametrach połączenia (oznaczenie czasu, adres IP) w celu zapewnienia bezpieczeństwa i przeciwdziałania nadużyciom.",
+    ],
+  },
+  {
+    title: "Dane w aplikacji i integracjach",
+    blocks: [
+      "Aplikacja Paczkowo działa lokalnie na Twoim urządzeniu. Dane operacyjne — zamówienia, dane kupujących, przesyłki, magazyn i faktury — są przechowywane w lokalnej bazie danych na tym urządzeniu, a nie na serwerach Operatora.",
+      "W odniesieniu do danych osobowych Twoich klientów, pobieranych z podłączonych kanałów sprzedaży, to Ty pozostajesz administratorem tych danych. Operator przetwarza je wyłącznie w zakresie technicznie niezbędnym do świadczenia usługi i na Twoje polecenie.",
+      "Zakres danych pobieranych z integracji zależy od uprawnień, które nadasz podczas autoryzacji. Dane te są wykorzystywane wyłącznie do realizacji funkcji wybranych przez Ciebie: obsługi zamówień, wysyłki, magazynu, zwrotów lub fakturowania.",
+      "Serwery Operatora obsługują konto, licencję, aktualizacje oraz pośredniczą w autoryzacji integracji.",
+    ],
+  },
+  {
+    title: "Hosting i logi serwera",
+    blocks: [
+      `Serwis jest hostowany (technicznie utrzymywany) na serwerze operatora: <strong>${company.hosting}</strong>.`,
+      "Firma hostingowa w celu zapewnienia niezawodności technicznej prowadzi logi na poziomie serwera. Zapisowi mogą podlegać:",
+      [
+        "zasoby określone identyfikatorem URL (adresy żądanych zasobów — stron, plików),",
+        "czas nadejścia zapytania i czas wysłania odpowiedzi,",
+        "nazwa stacji klienta — identyfikacja realizowana przez protokół HTTP,",
+        "informacje o błędach, jakie nastąpiły przy realizacji transakcji HTTP,",
+        "adres URL strony poprzednio odwiedzanej przez użytkownika (referer link),",
+        "informacje o przeglądarce użytkownika oraz o adresie IP,",
+        "informacje związane z obsługą poczty elektronicznej kierowanej do Operatora oraz wysyłanej przez Operatora.",
+      ],
+      "Dane z logów wykorzystywane są wyłącznie do administrowania serwisem i zapewnienia jego bezpieczeństwa.",
+    ],
+  },
+  {
+    title: "Odbiorcy danych",
+    blocks: [
+      "W niektórych sytuacjach Administrator ma prawo przekazywać dane osobowe innym odbiorcom, jeśli będzie to niezbędne do wykonania zawartej umowy lub do zrealizowania obowiązków ciążących na Administratorze. Dotyczy to następujących grup odbiorców:",
+      [
+        "firma hostingowa — na zasadzie powierzenia przetwarzania,",
+        "dostawca obsługi formularza kontaktowego (Web3Forms),",
+        "operatorzy płatności,",
+        "dostawcy usług, które użytkownik samodzielnie podłącza do aplikacji (m.in. Allegro, Erli, InPost, KSeF),",
+        "upoważnieni współpracownicy, którzy korzystają z danych w celu realizacji celu działania serwisu,",
+        "organy publiczne — w zakresie wynikającym z przepisów prawa.",
+      ],
+      "Dane nie są sprzedawane ani udostępniane w celach marketingowych podmiotom trzecim.",
+    ],
+  },
+  {
+    title: "Przekazywanie danych poza EOG",
+    blocks: [
+      "Część danych może być przekazywana do państw trzecich, tj. poza Europejski Obszar Gospodarczy — dotyczy to w szczególności obsługi formularza kontaktowego przez Web3Forms, którego serwery znajdują się w Stanach Zjednoczonych.",
+      "Przekazanie odbywa się na podstawie mechanizmów przewidzianych w rozdziale V RODO, w szczególności standardowych klauzul umownych zatwierdzonych przez Komisję Europejską lub decyzji stwierdzającej odpowiedni stopień ochrony.",
+    ],
+  },
+  {
+    title: "Okres przechowywania danych",
+    blocks: [
+      "Dane osobowe przetwarzane są nie dłużej, niż jest to konieczne do wykonania związanych z nimi czynności określonych osobnymi przepisami (np. o prowadzeniu rachunkowości).",
+      [
+        "korespondencja z formularza kontaktowego — do czasu zakończenia obsługi zgłoszenia, a następnie przez okres przedawnienia roszczeń,",
+        "dane konta — przez czas obowiązywania umowy, a po jej zakończeniu przez okres przedawnienia roszczeń,",
+        "dane rozliczeniowe — przez okres wymagany przepisami podatkowymi i o rachunkowości,",
+        "logi serwera — przez okres niezbędny do zapewnienia bezpieczeństwa i diagnostyki.",
+      ],
+      "Dane przetwarzane na podstawie zgody usuwamy po jej wycofaniu, o ile nie istnieje inna podstawa dalszego przetwarzania.",
+    ],
+  },
+  {
+    title: "Twoje prawa",
+    blocks: [
+      "Przysługuje Ci prawo żądania od Administratora:",
+      [
+        "dostępu do dotyczących Cię danych osobowych,",
+        "ich sprostowania,",
+        "usunięcia,",
+        "ograniczenia przetwarzania,",
+        "oraz przenoszenia danych.",
+      ],
+      "Przysługuje Ci prawo wniesienia sprzeciwu wobec przetwarzania danych osobowych opartego na prawnie uzasadnionym interesie Administratora, w tym profilowania. Prawo sprzeciwu nie będzie mogło być wykonane w przypadku istnienia ważnych prawnie uzasadnionych podstaw do przetwarzania, nadrzędnych wobec Twoich interesów, praw i wolności, w szczególności ustalenia, dochodzenia lub obrony roszczeń.",
+      "Jeżeli przetwarzanie odbywa się na podstawie zgody, możesz ją w każdej chwili wycofać — bez wpływu na zgodność z prawem przetwarzania dokonanego przed jej wycofaniem.",
+      `Żądania możesz zgłosić na adres ${mail}.`,
+      "Na działania Administratora przysługuje Ci skarga do Prezesa Urzędu Ochrony Danych Osobowych, ul. Stawki 2, 00-193 Warszawa.",
+    ],
+  },
+  {
+    title: "Zautomatyzowane decyzje i profilowanie",
+    blocks: [
+      "Twoje dane nie są wykorzystywane do zautomatyzowanego podejmowania decyzji wywołujących wobec Ciebie skutki prawne ani w podobny sposób istotnie na Ciebie wpływających.",
+      "Automatyczne przetwarzanie ogranicza się do mechanizmów technicznych niezbędnych do działania usługi, takich jak weryfikacja statusu licencji i wykrywanie nadużyć.",
+    ],
+  },
+  {
+    title: "Bezpieczeństwo danych",
+    blocks: [
+      "Miejsca logowania i wprowadzania danych osobowych są chronione w warstwie transmisji (certyfikat SSL). Dzięki temu dane osobowe i dane logowania wprowadzone w serwisie są szyfrowane w urządzeniu użytkownika i mogą być odczytane jedynie na docelowym serwerze.",
+      "Hasła użytkowników są przechowywane w postaci hashowanej. Funkcja hashująca działa jednokierunkowo — nie jest możliwe odwrócenie jej działania, co stanowi współczesny standard w zakresie przechowywania haseł.",
+      "Rejestracja konta wymaga potwierdzenia adresu e-mail oraz numeru telefonu, co stanowi dodatkową formę ochrony dostępu do usługi.",
+      "Operator stosuje hasła złożone, zawierające małe i wielkie litery, cyfry oraz znaki specjalne, nie krótsze niż 8 znaków, oraz okresowo zmienia hasła administracyjne.",
+      "Aktualizacje aplikacji są podpisywane cyfrowo i weryfikowane przed instalacją. Oprogramowanie wykorzystywane do przetwarzania danych osobowych jest regularnie aktualizowane.",
+    ],
+  },
+  {
+    title: "Pliki cookies i pamięć przeglądarki",
+    blocks: [
+      "Serwis korzysta z plików cookies oraz z pamięci lokalnej przeglądarki (localStorage).",
+      "Pliki cookies stanowią dane informatyczne, w szczególności pliki tekstowe, które przechowywane są w urządzeniu końcowym użytkownika i przeznaczone są do korzystania ze stron internetowych serwisu. Cookies zazwyczaj zawierają nazwę strony, z której pochodzą, czas przechowywania oraz unikalny numer.",
+      "Podmiotem zamieszczającym pliki cookies na urządzeniu końcowym użytkownika i uzyskującym do nich dostęp jest Operator serwisu.",
+      "Wykorzystujemy wyłącznie mechanizmy niezbędne do działania serwisu:",
+      [
+        "zapamiętanie wybranego motywu kolorystycznego strony,",
+        "utrzymanie stanu interaktywnego demo (filtry, ustawienia widoku) — dane demo pozostają w Twojej przeglądarce i nie są nam przesyłane,",
+        "utrzymanie sesji po zalogowaniu, dzięki czemu nie trzeba podawać loginu i hasła na każdej podstronie.",
+      ],
+      "<strong>Serwis nie korzysta z cookies analitycznych ani marketingowych</strong> i nie osadza narzędzi śledzących podmiotów trzecich.",
+      "W ramach serwisu stosowane są dwa zasadnicze rodzaje plików cookies: „sesyjne" (session cookies) oraz „stałe" (persistent cookies). Cookies sesyjne są plikami tymczasowymi, przechowywanymi do czasu wylogowania, opuszczenia strony lub wyłączenia przeglądarki. Cookies stałe przechowywane są przez czas określony w ich parametrach lub do czasu usunięcia przez użytkownika.",
+      "Ograniczenia stosowania plików cookies mogą wpłynąć na niektóre funkcjonalności dostępne w serwisie.",
+    ],
+  },
+  {
+    title: "Zarządzanie plikami cookies",
+    blocks: [
+      "Oprogramowanie do przeglądania stron internetowych zazwyczaj domyślnie dopuszcza przechowywanie plików cookies w urządzeniu końcowym. Użytkownik może w każdej chwili zmienić te ustawienia, usunąć zapisane pliki cookies albo zablokować ich zapisywanie.",
+      "Zastrzegamy, że wyłączenie obsługi plików cookies niezbędnych dla procesów uwierzytelniania, bezpieczeństwa i utrzymania preferencji użytkownika może utrudnić, a w skrajnych przypadkach uniemożliwić korzystanie ze stron www.",
+      "Instrukcje dla najpopularniejszych przeglądarek:",
+      [
+        link("https://support.microsoft.com/pl-pl/microsoft-edge/usuwanie-plik%C3%B3w-cookie-w-przegl%C4%85darce-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09", "Microsoft Edge"),
+        link("https://support.google.com/chrome/answer/95647?hl=pl", "Google Chrome (także Android)"),
+        link("https://support.mozilla.org/pl/kb/ciasteczka", "Mozilla Firefox"),
+        link("https://support.apple.com/pl-pl/guide/safari/sfri11471/mac", "Safari (macOS)"),
+        link("https://support.apple.com/pl-pl/105082", "Safari (iOS)"),
+        link("https://help.opera.com/pl/latest/web-preferences/", "Opera"),
+      ],
+    ],
+  },
+  {
+    title: "Zmiany polityki prywatności",
+    blocks: [
+      "Polityka może być aktualizowana w związku ze zmianą przepisów, zakresu usługi lub wykorzystywanych narzędzi.",
+      "Aktualna wersja jest zawsze publikowana na tej stronie wraz z datą ostatniej aktualizacji. W przypadku istotnych zmian poinformujemy o nich dodatkowo na adres e-mail przypisany do konta.",
+      `Pytania dotyczące prywatności prosimy kierować na adres ${mail}.`,
+    ],
+  },
 ];
 ---
-<Layout title="Polityka prywatności — Paczkowo"><LegalDocument title="Polityka prywatności" lead="Informacje o tym, jakie dane są przetwarzane przy korzystaniu z Paczkowo." updated="23 lipca 2026" sections={sections} /></Layout>
+
+<Layout
+  title="Polityka prywatności — Paczkowo"
+  description="Polityka prywatności paczkowo.net: jakie dane przetwarzamy, w jakim celu, komu je powierzamy i jakie masz prawa."
+>
+  <LegalDocument
+    title="Polityka prywatności"
+    lead="Informacje o tym, jakie dane przetwarzamy przy korzystaniu ze strony paczkowo.net i aplikacji Paczkowo, w jakim celu i na jakiej podstawie."
+    updated={company.updated}
+    sections={sections}
+  />
+</Layout>

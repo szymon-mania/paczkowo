@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal, Trash2, X } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/serverStatus";
 
 type DevLogEntry = {
   timestamp: string;

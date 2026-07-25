@@ -1,36 +1,62 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/serverStatus";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Clipboard,
   ExternalLink,
-  Eye,
   FileText,
   PackageCheck,
   PackageOpen,
   Printer,
   RefreshCw,
-  Search,
   Truck,
 } from "lucide-react";
 
-import { CommerceHeader, CommerceModal, CommercePage, CommercePagination, EmptyTable, KpiStrip, StatusPill } from "../components/CommerceUi";
+import { CommerceModal, CommercePagination, KpiStrip, StatusPill } from "../components/CommerceUi";
+import {
+  AccountFilterMulti,
+  buildChannelOptions,
+  channelAccountKey,
+  channelLabel,
+  CourierFilterPanel,
+  courierIdForCarrier,
+  PlatformLogo,
+} from "../components/ListFilters";
 import ProductThumbs from "../components/ProductThumbs";
 import StatusPath, { type StatusPathStep } from "../components/StatusPath";
+import { SyncProgressPanel, SyncSummaryBanner, type SyncSummary } from "../components/SyncStatus";
 import { carrierLabel } from "../lib/carriers";
-import { T, translateMessage, useI18n } from "../lib/i18n";
-import { syncProgressPercent, type SyncProgressState, type SyncStepStatus } from "../lib/syncProgress";
+import { T, localeOf, translateMessage, useI18n } from "../lib/i18n";
+import { type SyncProgressState } from "../lib/syncProgress";
 import type { Order, Shipment } from "../lib/types";
 
 type StatusFilter = "ALL" | "CREATED" | "IN_TRANSIT" | "READY_FOR_PICKUP" | "DELIVERED" | "ISSUES";
+
+// Segmenty statusu w kolejności jak w Zamówieniach: konkretne stany, „Wszystkie" na końcu.
+const SHIPMENT_SEGMENTS: Exclude<StatusFilter, "ALL">[] = ["CREATED", "IN_TRANSIT", "READY_FOR_PICKUP", "DELIVERED", "ISSUES"];
+
+const SHIP_FILTER_STATUS_KEY = "shipmentStatusFilter";
+const SHIP_FILTER_CHANNEL_KEY = "shipmentChannelFilter";
+const SHIP_FILTER_COURIER_KEY = "shipmentCourierFilter";
+
+/** Zapamiętane kanały: tablica kluczy. Stary format (jeden klucz albo „all") wciąż się wczytuje. */
+function readSavedChannels(): Set<string> {
+  const raw = localStorage.getItem(SHIP_FILTER_CHANNEL_KEY);
+  if (!raw || raw === "all") return new Set();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set(parsed.filter((value): value is string => typeof value === "string"));
+  } catch { /* stary format: pojedynczy klucz kanału */ }
+  return new Set([raw]);
+}
 
 type ShipmentRow = {
   key: string;
   order: Order;
   shipment: Shipment;
   tracking: string;
-  carrierKey: string;
+  courierId: string;
   carrierName: string;
   providerName: string;
   platformName: string;
@@ -51,18 +77,19 @@ type AllegroShipmentInfo = {
   error?: string;
 };
 
-type SyncNotice = { text: string; ok: boolean };
-
 type Copy = {
   title: string;
-  subtitle: string;
+  countOne: string;
+  countMany: string;
   refresh: string;
+  syncing: string;
   lastSync: string;
   neverSynced: string;
   search: string;
-  allCarriers: string;
-  allAccounts: string;
-  allPlatforms: string;
+  searchPlaceholder: string;
+  status: string;
+  channel: string;
+  courier: string;
   allStatuses: string;
   created: string;
   inTransit: string;
@@ -81,15 +108,13 @@ type Copy = {
   staleDetail: string;
   missingTitle: string;
   missingDetail: string;
-  carrierLoad: string;
-  carrierLoadDetail: string;
   colShipment: string;
   colCustomer: string;
+  colChannel: string;
   colCarrier: string;
   colTracking: string;
   colStatus: string;
   colCreated: string;
-  colActions: string;
   order: string;
   account: string;
   destination: string;
@@ -132,14 +157,17 @@ function allegroDetailKey(login: string, shipmentId: string) {
 const COPY: Record<"pl" | "en", Copy> = {
   pl: {
     title: "Wysyłka",
-    subtitle: "Panel nadanych przesyłek: śledzenie, etykiety, przewoźnicy i szybki wgląd w zamówienie.",
+    countOne: "{n} przesyłka",
+    countMany: "{n} przesyłek",
     refresh: "Synchronizuj",
-    lastSync: "Ostatnia synchronizacja: {time}",
+    syncing: "Synchronizacja...",
+    lastSync: "Zsync. {time}",
     neverSynced: "Brak synchronizacji w tej sesji",
-    search: "Szukaj po numerze, kliencie, przesyłce, mieście...",
-    allCarriers: "Wszyscy przewoźnicy",
-    allAccounts: "Wszystkie konta",
-    allPlatforms: "Wszystkie kanały",
+    search: "Szukaj",
+    searchPlaceholder: "Nr przesyłki, zamówienia, klient, miasto...",
+    status: "Status",
+    channel: "Kanał",
+    courier: "Przewoźnik",
     allStatuses: "Wszystkie",
     created: "Utworzone",
     inTransit: "W drodze",
@@ -158,15 +186,13 @@ const COPY: Record<"pl" | "en", Copy> = {
     staleDetail: "Sprawdź przesyłki bez doręczenia lub odbioru.",
     missingTitle: "Bez numeru śledzenia",
     missingDetail: "Etykieta mogła być jeszcze generowana przez przewoźnika.",
-    carrierLoad: "Obciążenie przewoźników",
-    carrierLoadDetail: "Rozkład nadanych paczek według przewoźnika.",
     colShipment: "Przesyłka",
     colCustomer: "Klient",
+    colChannel: "Kanał",
     colCarrier: "Przewoźnik",
     colTracking: "Tracking",
     colStatus: "Status",
     colCreated: "Nadano",
-    colActions: "",
     order: "Zamówienie",
     account: "Konto",
     destination: "Cel",
@@ -200,14 +226,17 @@ const COPY: Record<"pl" | "en", Copy> = {
   },
   en: {
     title: "Shipping",
-    subtitle: "Dispatched shipment control: tracking, labels, carriers and quick order context.",
+    countOne: "{n} shipment",
+    countMany: "{n} shipments",
     refresh: "Sync",
-    lastSync: "Last sync: {time}",
+    syncing: "Syncing...",
+    lastSync: "Synced {time}",
     neverSynced: "No sync in this session",
-    search: "Search by number, customer, shipment, city...",
-    allCarriers: "All carriers",
-    allAccounts: "All accounts",
-    allPlatforms: "All channels",
+    search: "Search",
+    searchPlaceholder: "Shipment no., order, customer, city...",
+    status: "Status",
+    channel: "Channel",
+    courier: "Carrier",
     allStatuses: "All",
     created: "Created",
     inTransit: "In transit",
@@ -226,15 +255,13 @@ const COPY: Record<"pl" | "en", Copy> = {
     staleDetail: "Check parcels without delivery or pickup confirmation.",
     missingTitle: "Missing tracking number",
     missingDetail: "The label may still be generated by the carrier.",
-    carrierLoad: "Carrier workload",
-    carrierLoadDetail: "Dispatched parcel distribution by carrier.",
     colShipment: "Shipment",
     colCustomer: "Customer",
+    colChannel: "Channel",
     colCarrier: "Carrier",
     colTracking: "Tracking",
     colStatus: "Status",
     colCreated: "Created",
-    colActions: "",
     order: "Order",
     account: "Account",
     destination: "Destination",
@@ -280,16 +307,6 @@ function buyerName(order: Order) {
 
 function destination(order: Order) {
   return [order.deliveryZipCode, order.deliveryCity].filter(Boolean).join(" ") || order.pickupPointId || "-";
-}
-
-function channelLabel(value?: string) {
-  const key = (value ?? "").toLowerCase();
-  if (key === "allegro") return "Allegro";
-  if (key === "erli") return "ERLI";
-  if (key === "inpost_merchant") return "InPost Merchant";
-  if (key === "amazon") return "Amazon";
-  if (key === "ebay") return "eBay";
-  return value || "-";
 }
 
 function providerLabel(provider: string) {
@@ -378,6 +395,13 @@ function formatDate(value: string | undefined, locale: string) {
   return parsed.toLocaleString(locale, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function formatShortDate(value: string | undefined, locale: string) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${parsed.toLocaleDateString(locale, { day: "2-digit", month: "short" })}, ${parsed.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 function statusLabel(status: Shipment["status"], copy: Copy) {
   switch (status) {
     case "CREATED":
@@ -403,6 +427,24 @@ function statusTone(status: Shipment["status"]): "neutral" | "accent" | "good" |
   if (status === "IN_TRANSIT") return "accent";
   if (status === "CANCELED" || status === "FAILED") return "danger";
   return "neutral";
+}
+
+// Tagi statusu w stylu tabeli zamówień (te same klasy `tag`).
+function ShipmentStatusBadge({ status, copy }: { status: Shipment["status"]; copy: Copy }) {
+  const cfg: Record<string, { cls: string; strike?: boolean }> = {
+    CREATED: { cls: "tag tag-accent" },
+    IN_TRANSIT: { cls: "tag tag-accent" },
+    READY_FOR_PICKUP: { cls: "tag tag-outline" },
+    DELIVERED: { cls: "tag tag-neutral" },
+    CANCELED: { cls: "tag tag-neutral", strike: true },
+    FAILED: { cls: "tag tag-outline" },
+  };
+  const d = cfg[String(status ?? "")] ?? { cls: "tag tag-neutral" };
+  return (
+    <span className={d.cls} style={d.strike ? { textDecoration: "line-through", opacity: 0.65 } : undefined}>
+      {statusLabel(status, copy)}
+    </span>
+  );
 }
 
 function shipmentStatusPath(status: Shipment["status"], lang: string): StatusPathStep[] {
@@ -439,55 +481,6 @@ function matchesStatus(row: ShipmentRow, filter: StatusFilter) {
   return row.shipment.status === filter;
 }
 
-function accountKey(order: Order) {
-  return `${order.marketplace}::${order.accountName}`;
-}
-
-function labelForAccount(order: Order) {
-  return `${channelLabel(order.marketplace)} - ${order.accountDisplayName || order.accountName || "-"}`;
-}
-
-function syncStatusLabel(status: SyncStepStatus, lang: string) {
-  if (lang === "pl") return status === "active" ? "W toku" : status === "done" ? "Gotowe" : status === "error" ? "Błąd" : "Czeka";
-  return status === "active" ? "In progress" : status === "done" ? "Done" : status === "error" ? "Error" : "Waiting";
-}
-
-function ShippingSyncProgress({ progress, message }: { progress: SyncProgressState; message?: SyncNotice | null }) {
-  const { t, lang } = useI18n();
-  const active = progress.steps.find((item) => item.status === "active");
-  const finished = progress.steps.filter((item) => item.status === "done" || item.status === "error").length;
-  const context = active
-    ? `${lang === "pl" ? "Teraz" : "Now"}: ${active.label}`
-    : progress.done
-      ? (lang === "pl" ? "Zakończono" : "Done")
-      : progress.title;
-  const numbers = [
-    `${finished} / ${progress.steps.length}`,
-    lang === "pl" ? `pobrano ${progress.fetched}` : `fetched ${progress.fetched}`,
-    lang === "pl" ? `zapisano ${progress.saved}` : `saved ${progress.saved}`,
-  ];
-  return (
-    <section className="commerce-sync-progress shipping-sync-progress" role="status" aria-live="polite">
-      <div><strong>{t(T.ord_sync)}</strong><span>{context} / {numbers.join(" / ")}</span></div>
-      <div className="commerce-sync-progress-track"><span style={{ width: `${syncProgressPercent(progress)}%` }} /></div>
-      <div className="commerce-sync-platforms">
-        {progress.steps.map((item) => {
-          const status = syncStatusLabel(item.status, lang);
-          const detail = item.status === "done" || item.status === "error" ? item.detail : undefined;
-          return (
-            <span className={`commerce-sync-platform ${item.status}`} key={item.key} title={item.detail}>
-              <span className="commerce-sync-dot" />
-              <strong>{item.label}</strong>
-              <small>{detail ? `${status} / ${detail}` : status}</small>
-            </span>
-          );
-        })}
-      </div>
-      {message && <div className={`shipping-sync-message ${message.ok ? "good" : "danger"}`}>{message.text}</div>}
-    </section>
-  );
-}
-
 export default function Shipping({
   orders,
   loading,
@@ -495,7 +488,8 @@ export default function Shipping({
   lastSyncAt,
   onSync,
   syncProgress,
-  syncMessage,
+  syncSummary,
+  onDismissSummary,
   defaultPrinter,
   onOpenOrder,
 }: {
@@ -505,18 +499,21 @@ export default function Shipping({
   lastSyncAt: Date | null;
   onSync: () => Promise<void> | void;
   syncProgress?: SyncProgressState | null;
-  syncMessage?: SyncNotice | null;
+  syncSummary?: SyncSummary | null;
+  onDismissSummary?: () => void;
   defaultPrinter: string;
   onOpenOrder?: (orderId: number) => void;
 }) {
   const { t, lang } = useI18n();
-  const locale = lang === "pl" ? "pl-PL" : "en-GB";
+  const locale = localeOf(lang);
   const copy = COPY[lang === "en" ? "en" : "pl"];
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("ALL");
-  const [carrier, setCarrier] = useState("ALL");
-  const [account, setAccount] = useState("ALL");
-  const [platform, setPlatform] = useState("ALL");
+  const [status, setStatusState] = useState<StatusFilter>(() => {
+    const saved = localStorage.getItem(SHIP_FILTER_STATUS_KEY) as StatusFilter | null;
+    return saved && (saved === "ALL" || SHIPMENT_SEGMENTS.includes(saved as Exclude<StatusFilter, "ALL">)) ? saved : "ALL";
+  });
+  const [selChannels, setSelChannelsState] = useState<Set<string>>(readSavedChannels);
+  const [courierFilter, setCourierFilterState] = useState(() => localStorage.getItem(SHIP_FILTER_COURIER_KEY) || "all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState<ShipmentRow | null>(null);
@@ -524,6 +521,15 @@ export default function Shipping({
   const [actionError, setActionError] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [allegroDetails, setAllegroDetails] = useState<Record<string, AllegroShipmentInfo>>({});
+
+  const resetPage = () => setPage(1);
+  const setStatus = (value: StatusFilter) => { localStorage.setItem(SHIP_FILTER_STATUS_KEY, value); setStatusState(value); resetPage(); };
+  const setSelChannels = (next: Set<string>) => {
+    localStorage.setItem(SHIP_FILTER_CHANNEL_KEY, JSON.stringify([...next]));
+    setSelChannelsState(next);
+    resetPage();
+  };
+  const setCourierFilter = (value: string) => { localStorage.setItem(SHIP_FILTER_COURIER_KEY, value); setCourierFilterState(value); resetPage(); };
 
   const allegroLookup = useMemo(() => {
     const grouped: Record<string, string[]> = {};
@@ -582,7 +588,6 @@ export default function Shipping({
           externalStatus: shipment.externalStatus || detail?.error,
         };
         const carrierValue = effectiveShipment.carrier || order.carrier;
-        const carrierKey = normalizeCarrier(carrierValue);
         const createdAt = effectiveShipment.createdAt || order.externalUpdatedAt || order.orderCreatedAt;
         const days = ageDays(createdAt);
         const active = !["DELIVERED", "CANCELED", "FAILED"].includes(effectiveShipment.status);
@@ -591,10 +596,10 @@ export default function Shipping({
           order,
           shipment: effectiveShipment,
           tracking: effectiveShipment.trackingNumber?.trim() ?? "",
-          carrierKey,
+          courierId: courierIdForCarrier(carrierValue || order.deliveryMethodName),
           carrierName: prettyCarrier(carrierValue, t),
           providerName: providerLabel(effectiveShipment.provider),
-          platformName: channelLabel(effectiveShipment.marketplace || order.marketplace),
+          platformName: channelLabel(effectiveShipment.marketplace || order.marketplace, t),
           customerName: buyerName(order),
           destination: destination(order),
           createdAt,
@@ -619,52 +624,13 @@ export default function Shipping({
     return deduped.sort((a, b) => parseTime(b.createdAt) - parseTime(a.createdAt));
   }, [orders, allegroDetails, t]);
 
-  const carriers = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number }>();
-    rows.forEach((row) => {
-      const key = row.carrierKey || "other";
-      const current = map.get(key);
-      if (current) current.count += 1;
-      else map.set(key, { key, label: row.carrierName, count: 1 });
-    });
-    return [...map.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, locale));
-  }, [rows, locale]);
-
-  const accounts = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number }>();
-    rows.forEach((row) => {
-      const key = accountKey(row.order);
-      const current = map.get(key);
-      if (current) current.count += 1;
-      else map.set(key, { key, label: labelForAccount(row.order), count: 1 });
-    });
-    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, locale));
-  }, [rows, locale]);
-
-  const platforms = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number }>();
-    rows.forEach((row) => {
-      const key = row.order.marketplace || row.shipment.marketplace || "unknown";
-      const current = map.get(key);
-      if (current) current.count += 1;
-      else map.set(key, { key, label: channelLabel(key), count: 1 });
-    });
-    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, locale));
-  }, [rows, locale]);
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<StatusFilter, number> = { ALL: rows.length, CREATED: 0, IN_TRANSIT: 0, READY_FOR_PICKUP: 0, DELIVERED: 0, ISSUES: 0 };
-    rows.forEach((row) => {
-      if (row.shipment.status in counts) counts[row.shipment.status as StatusFilter] += 1;
-      if (matchesStatus(row, "ISSUES")) counts.ISSUES += 1;
-    });
-    return counts;
-  }, [rows]);
-
-  const filtered = useMemo(() => {
+  // Filtrowanie + liczniki (status / kurier / kanał). Każdy licznik pomija własny filtr,
+  // a lista kanałów jest pełna — pozycje bez trafień zostają widoczne z zerem.
+  const { filtered, statusCounts, courierCounts, channelOptions } = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((row) => {
-      const haystack = [
+    const passSearch = (row: ShipmentRow) => {
+      if (!q) return true;
+      return [
         row.shipment.id,
         row.tracking,
         row.order.externalOrderId,
@@ -675,14 +641,34 @@ export default function Shipping({
         row.providerName,
         row.platformName,
         row.order.accountName,
-      ].filter(Boolean).join(" ").toLowerCase();
-      return (!q || haystack.includes(q))
-        && matchesStatus(row, status)
-        && (carrier === "ALL" || row.carrierKey === carrier)
-        && (account === "ALL" || accountKey(row.order) === account)
-        && (platform === "ALL" || row.order.marketplace === platform || row.shipment.marketplace === platform);
-    });
-  }, [rows, search, status, carrier, account, platform]);
+      ].filter(Boolean).join(" ").toLowerCase().includes(q);
+    };
+    const passChannel = (row: ShipmentRow) => selChannels.size === 0 || selChannels.has(channelAccountKey(row.order));
+    const passStatus = (row: ShipmentRow) => matchesStatus(row, status);
+    const passCourier = (row: ShipmentRow) => courierFilter === "all" || row.courierId === courierFilter;
+
+    const filtered = rows.filter((row) => passStatus(row) && passChannel(row) && passCourier(row) && passSearch(row));
+
+    const preStatus = rows.filter((row) => passChannel(row) && passSearch(row));
+    const statusCounts: Record<string, number> = { ALL: preStatus.length };
+    for (const segment of SHIPMENT_SEGMENTS) statusCounts[segment] = preStatus.filter((row) => matchesStatus(row, segment)).length;
+
+    const preCourier = rows.filter((row) => passStatus(row) && passChannel(row) && passSearch(row));
+    const courierCounts: Record<string, number> = { all: preCourier.length };
+    for (const row of preCourier) courierCounts[row.courierId] = (courierCounts[row.courierId] ?? 0) + 1;
+
+    // Kanały: lista ze wszystkich przesyłek, liczniki z zakresu bez filtra kanału.
+    const preChannel = rows.filter((row) => passStatus(row) && passCourier(row) && passSearch(row));
+    const channelCounts = new Map<string, number>();
+    for (const row of preChannel) {
+      const key = channelAccountKey(row.order);
+      channelCounts.set(key, (channelCounts.get(key) ?? 0) + 1);
+    }
+    const channelOptions = buildChannelOptions(rows.map((row) => row.order), t)
+      .map((option) => ({ ...option, count: channelCounts.get(option.value) ?? 0 }));
+
+    return { filtered, statusCounts, courierCounts, channelOptions };
+  }, [rows, search, status, selChannels, courierFilter, t]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -692,14 +678,11 @@ export default function Shipping({
   const delivered = rows.filter((row) => row.shipment.status === "DELIVERED").length;
   const staleRows = rows.filter((row) => row.stale);
   const missingTracking = rows.filter((row) => !row.tracking);
-  const maxCarrierCount = Math.max(1, ...carriers.map((item) => item.count));
   const lastSyncLabel = lastSyncAt
     ? copy.lastSync.replace("{time}", lastSyncAt.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }))
     : copy.neverSynced;
 
-  const resetPage = () => setPage(1);
-  const setFilter = (next: StatusFilter) => { setStatus(next); resetPage(); };
-  const canOpenTracking = (row: ShipmentRow) => Boolean(row.tracking && trackingUrl(row.carrierKey, row.tracking));
+  const canOpenTracking = (row: ShipmentRow) => Boolean(row.tracking && trackingUrl(row.courierId, row.tracking));
   const canOpenLabel = (row: ShipmentRow) => Boolean(row.shipment.labelPath || row.shipment.provider === ALLEGRO_WZA_PROVIDER);
 
   async function withAction(key: string, action: () => Promise<void>) {
@@ -716,7 +699,7 @@ export default function Shipping({
   }
 
   async function openTracking(row: ShipmentRow) {
-    const url = row.tracking ? trackingUrl(row.carrierKey, row.tracking) : null;
+    const url = row.tracking ? trackingUrl(row.courierId, row.tracking) : null;
     if (!url) {
       setActionError(copy.trackingUnavailable);
       return;
@@ -756,8 +739,7 @@ export default function Shipping({
     await invoke("print_label", { pdfPath, printerName: defaultPrinter || null });
   }
 
-  const statusFilters: { key: StatusFilter; label: string }[] = [
-    { key: "ALL", label: copy.allStatuses },
+  const statusSegments: { key: Exclude<StatusFilter, "ALL">; label: string }[] = [
     { key: "CREATED", label: copy.created },
     { key: "IN_TRANSIT", label: copy.inTransit },
     { key: "READY_FOR_PICKUP", label: copy.ready },
@@ -766,182 +748,179 @@ export default function Shipping({
   ];
 
   return (
-    <CommercePage>
-      <CommerceHeader
-        title={copy.title}
-        subtitle={copy.subtitle}
-        action={(
-          <div className="commerce-header-actions shipping-header-actions">
-            <span className="shipping-sync-note">{lastSyncLabel}</span>
-            <button type="button" className="btn btn-secondary" disabled={syncing} onClick={() => void onSync()}>
-              <RefreshCw size={15} className={syncing ? "spin" : ""} />
-              {copy.refresh}
-            </button>
+    <main style={{ flex: 1, overflow: "auto", padding: "28px 32px 60px" }}>
+      <div style={{ maxWidth: 1360, margin: "0 auto" }}>
+        {/* Nagłówek */}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18, gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: "0 0 4px" }}>{copy.title}</h2>
+            <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+              {(filtered.length === 1 ? copy.countOne : copy.countMany).replace("{n}", String(filtered.length))}
+            </p>
           </div>
-        )}
-      />
-
-      {syncProgress && <ShippingSyncProgress progress={syncProgress} message={syncMessage} />}
-      {!syncProgress && syncMessage && (
-        <div className={`commerce-alert ${syncMessage.ok ? "good" : "danger"}`}>{syncMessage.text}</div>
-      )}
-
-      <KpiStrip items={[
-        { label: copy.shippedTotal, value: rows.length },
-        { label: copy.movingNow, value: moving },
-        { label: copy.readyForPickup, value: ready, tone: ready ? "warn" : "default" },
-        { label: copy.deliveredTotal, value: delivered, tone: delivered ? "good" : "default" },
-      ]} />
-
-      <section className="shipping-ops">
-        <div className="shipping-ops-main">
-          <div className="shipping-section-head">
-            <div>
-              <h3>{copy.operations}</h3>
-              <p>{copy.operationsDetail}</p>
-            </div>
-          </div>
-          <div className="shipping-watch-grid">
-            <button type="button" className="shipping-watch-tile" onClick={() => { setStatus("ISSUES"); resetPage(); }}>
-              <AlertTriangle size={18} />
-              <span><strong>{staleRows.length}</strong>{copy.staleTitle}</span>
-              <small>{copy.staleDetail}</small>
+          <div className="ord-header-actions">
+            <span style={{ fontSize: 11, color: "var(--muted2)" }}>{lastSyncLabel}</span>
+            <button type="button" className={`${syncing ? "btn btn-secondary" : "btn btn-primary"} ord-sync-button`} disabled={syncing} onClick={() => void onSync()}>
+              <RefreshCw size={14} style={{ animation: syncing ? "spin 1s linear infinite" : "none" }} />
+              {syncing ? copy.syncing : copy.refresh}
             </button>
-            <button type="button" className="shipping-watch-tile" onClick={() => { setStatus("ISSUES"); resetPage(); }}>
-              <PackageOpen size={18} />
-              <span><strong>{missingTracking.length}</strong>{copy.missingTitle}</span>
-              <small>{copy.missingDetail}</small>
-            </button>
+            {syncProgress && <SyncProgressPanel progress={syncProgress} />}
           </div>
         </div>
-        <div className="shipping-carriers">
-          <div className="shipping-section-head compact">
-            <div>
-              <h3>{copy.carrierLoad}</h3>
-              <p>{copy.carrierLoadDetail}</p>
+
+        {syncSummary && onDismissSummary && <SyncSummaryBanner summary={syncSummary} onDismiss={onDismissSummary} />}
+
+        <KpiStrip items={[
+          { label: copy.shippedTotal, value: rows.length },
+          { label: copy.movingNow, value: moving },
+          { label: copy.readyForPickup, value: ready, tone: ready ? "warn" : "default" },
+          { label: copy.deliveredTotal, value: delivered, tone: delivered ? "good" : "default" },
+        ]} />
+
+        <section className="shipping-ops">
+          <div className="shipping-ops-main">
+            <div className="shipping-section-head">
+              <div>
+                <h3>{copy.operations}</h3>
+                <p>{copy.operationsDetail}</p>
+              </div>
             </div>
-          </div>
-          <div className="shipping-carrier-list">
-            {carriers.slice(0, 6).map((item) => (
-              <button type="button" key={item.key} className="shipping-carrier-row" onClick={() => { setCarrier(item.key); resetPage(); }}>
-                <span>{item.label}</span>
-                <strong>{item.count}</strong>
-                <i style={{ width: `${Math.max(8, (item.count / maxCarrierCount) * 100)}%` }} />
+            <div className="shipping-watch-grid">
+              <button type="button" className="shipping-watch-tile" onClick={() => setStatus("ISSUES")}>
+                <AlertTriangle size={18} />
+                <span><strong>{staleRows.length}</strong>{copy.staleTitle}</span>
+                <small>{copy.staleDetail}</small>
               </button>
-            ))}
-            {carriers.length === 0 && <div className="shipping-mini-empty">-</div>}
+              <button type="button" className="shipping-watch-tile" onClick={() => setStatus("ISSUES")}>
+                <PackageOpen size={18} />
+                <span><strong>{missingTracking.length}</strong>{copy.missingTitle}</span>
+                <small>{copy.missingDetail}</small>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {actionError && <div className="commerce-alert danger">{actionError}</div>}
+        {notice && <div className="commerce-alert good">{notice}</div>}
+
+        {/* Filtry: szukaj + status + kanał + przewoźnik (model jak w zamówieniach) */}
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
+          <div className="field" style={{ maxWidth: 280, flex: 1, minWidth: 200 }}>
+            <label htmlFor="ship-search">{copy.search}</label>
+            <input className="input" id="ship-search" placeholder={copy.searchPlaceholder} value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} />
+          </div>
+          <div className="field">
+            <label id="ship-status-label">{copy.status}</label>
+            <div className="seg" role="radiogroup" aria-labelledby="ship-status-label">
+              {statusSegments.map((segment) => (
+                <label key={segment.key} className="seg-opt">
+                  <input type="radio" name="shipstatusf" checked={status === segment.key} onChange={() => setStatus(segment.key)} />
+                  {segment.label}<span className="seg-count">{statusCounts[segment.key] ?? 0}</span>
+                </label>
+              ))}
+              <label className="seg-opt">
+                <input type="radio" name="shipstatusf" checked={status === "ALL"} onChange={() => setStatus("ALL")} />
+                {copy.allStatuses}<span className="seg-count">{statusCounts.ALL ?? 0}</span>
+              </label>
+            </div>
+          </div>
+          <div className="field" style={{ maxWidth: 230 }}>
+            <label htmlFor="ship-channel">{copy.channel}</label>
+            <AccountFilterMulti id="ship-channel" selected={selChannels} options={channelOptions} onChange={setSelChannels} />
+          </div>
+          <div className="field ord-courier-field">
+            <label>{copy.courier}</label>
+            <CourierFilterPanel value={courierFilter} onChange={setCourierFilter} counts={courierCounts} />
           </div>
         </div>
-      </section>
 
-      {actionError && <div className="commerce-alert danger">{actionError}</div>}
-      {notice && <div className="commerce-alert good">{notice}</div>}
-
-      <section className="commerce-toolbar shipping-toolbar">
-        <div className="commerce-search shipping-search">
-          <Search size={15} />
-          <input value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder={copy.search} />
-        </div>
-        <div className="seg shipping-status-seg">
-          {statusFilters.map((item) => (
-            <button type="button" key={item.key} className={`commerce-seg-btn${status === item.key ? " active" : ""}`} onClick={() => setFilter(item.key)}>
-              {item.label}<span>{statusCounts[item.key]}</span>
-            </button>
-          ))}
-        </div>
-        <div className="shipping-filter-selects">
-          <select className="input" value={platform} onChange={(event) => { setPlatform(event.target.value); resetPage(); }}>
-            <option value="ALL">{copy.allPlatforms}</option>
-            {platforms.map((item) => <option key={item.key} value={item.key}>{item.label} ({item.count})</option>)}
-          </select>
-          <select className="input" value={account} onChange={(event) => { setAccount(event.target.value); resetPage(); }}>
-            <option value="ALL">{copy.allAccounts}</option>
-            {accounts.map((item) => <option key={item.key} value={item.key}>{item.label} ({item.count})</option>)}
-          </select>
-          <select className="input" value={carrier} onChange={(event) => { setCarrier(event.target.value); resetPage(); }}>
-            <option value="ALL">{copy.allCarriers}</option>
-            {carriers.map((item) => <option key={item.key} value={item.key}>{item.label} ({item.count})</option>)}
-          </select>
-        </div>
-      </section>
-
-      <section className="commerce-table-wrap shipping-table-wrap">
-        {loading ? (
-          <div className="commerce-loading">{t(T.common_loading)}</div>
-        ) : filtered.length === 0 ? (
-          <EmptyTable title={copy.noShipments} detail={copy.noShipmentsDetail} />
-        ) : (
-          <table className="table commerce-table shipping-table">
-            <thead>
-              <tr>
-                <th>{copy.colShipment}</th>
-                <th>{copy.colCustomer}</th>
-                <th>{copy.colCarrier}</th>
-                <th>{copy.colTracking}</th>
-                <th>{copy.colStatus}</th>
-                <th>{copy.colCreated}</th>
-                <th>{copy.colActions}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((row) => {
-                const trackable = canOpenTracking(row);
-                const labelAvailable = canOpenLabel(row);
-                const rowBusy = busyKey.startsWith(row.key);
-                return (
-                  <tr key={row.key} className={row.stale || !row.tracking ? "shipping-row-attention" : undefined}>
-                    <td>
-                      <div className="shipping-order-cell">
-                        <ProductThumbs items={row.order.items ?? []} />
-                        <div>
-                          <strong>#{shortId(row.order.externalOrderId)}</strong>
-                          <span className="commerce-subline">{row.platformName} / {row.order.accountDisplayName || row.order.accountName}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{row.customerName}</strong>
-                      <span className="commerce-subline">{copy.destination}: {row.destination}</span>
-                    </td>
-                    <td>
-                      <strong>{row.carrierName}</strong>
-                      <span className="commerce-subline">{row.providerName}</span>
-                    </td>
-                    <td>
-                      <button type="button" className="shipping-tracking-code" disabled={!row.tracking} onClick={() => void copyTracking(row)}>
-                        {row.tracking || copy.noTracking}
-                      </button>
-                    </td>
-                    <td>
-                      <div className="shipping-status-cell">
-                        <StatusPill tone={row.stale ? "warn" : statusTone(row.shipment.status)}>{statusLabel(row.shipment.status, copy)}</StatusPill>
-                        {row.shipment.externalStatus && <span className="commerce-subline">{row.shipment.externalStatus}</span>}
-                        <StatusPath steps={shipmentStatusPath(row.shipment.status, lang)} compact className="shipping-row-status-path" />
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{formatDate(row.createdAt, locale)}</strong>
-                      {row.ageDays != null && <span className="commerce-subline">{copy.days.replace("{n}", String(row.ageDays))}</span>}
-                    </td>
-                    <td>
-                      <div className="commerce-actions shipping-actions">
-                        <button type="button" className="btn btn-ghost btn-icon" disabled={!trackable || rowBusy} title={trackable ? copy.openTracking : copy.trackingUnavailable} onClick={() => void withAction(`${row.key}:track`, () => openTracking(row))}><ExternalLink size={15} /></button>
-                        <button type="button" className="btn btn-ghost btn-icon" disabled={!row.tracking || rowBusy} title={copy.copyTracking} onClick={() => void copyTracking(row)}><Clipboard size={15} /></button>
-                        <button type="button" className="btn btn-ghost btn-icon" disabled={!labelAvailable || rowBusy} title={copy.label} onClick={() => void withAction(`${row.key}:label`, () => openLabel(row))}><FileText size={15} /></button>
-                        <button type="button" className="btn btn-ghost btn-icon" disabled={!labelAvailable || rowBusy} title={copy.print} onClick={() => void withAction(`${row.key}:print`, () => printLabel(row))}><Printer size={15} /></button>
-                        {onOpenOrder && <button type="button" className="btn btn-ghost btn-icon" title={copy.openOrder} onClick={() => onOpenOrder(row.order.id)}><Truck size={15} /></button>}
-                        <button type="button" className="btn btn-ghost btn-icon" title={copy.details} onClick={() => setSelected(row)}><Eye size={15} /></button>
-                      </div>
-                    </td>
+        {/* Tabela */}
+        <div className="card elev-sm" style={{ padding: 0, overflowX: "auto" }}>
+          {loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220 }}>
+              <div style={{ width: 24, height: 24, border: "3px solid var(--accent)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            </div>
+          ) : (
+            <>
+              <table className="table" style={{ fontSize: 14 }}>
+                <thead>
+                  <tr>
+                    <th style={{ paddingLeft: "var(--space-4)" }}>{copy.colShipment}</th>
+                    <th>{copy.colCustomer}</th>
+                    <th>{copy.colChannel}</th>
+                    <th>{copy.colCarrier}</th>
+                    <th>{copy.colTracking}</th>
+                    <th>{copy.colStatus}</th>
+                    <th>{copy.colCreated}</th>
+                    <th style={{ paddingRight: "var(--space-4)" }}></th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      {!loading && <CommercePagination page={currentPage} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); resetPage(); }} />}
+                </thead>
+                <tbody>
+                  {visible.map((row) => {
+                    const trackable = canOpenTracking(row);
+                    const labelAvailable = canOpenLabel(row);
+                    const rowBusy = busyKey.startsWith(row.key);
+                    return (
+                      <tr key={row.key} className={`ord-row-click${row.stale || !row.tracking ? " shipping-row-attention" : ""}`} onClick={() => setSelected(row)}>
+                        <td style={{ paddingLeft: "var(--space-4)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                            <ProductThumbs items={row.order.items ?? []} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontFamily: "var(--font-heading)", color: "var(--accent)" }}>#{shortId(row.order.externalOrderId)}</div>
+                              <div className="text-muted" style={{ fontSize: 11 }}>{row.providerName}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ maxWidth: 200, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.customerName}</div>
+                          <div className="text-muted" style={{ fontSize: 11 }}>{row.destination}</div>
+                        </td>
+                        <td>
+                          <div className="order-channel-cell">
+                            <PlatformLogo platform={row.order.marketplace} fallback={row.platformName} size={22} />
+                            <span className="order-channel-copy">
+                              <strong>{row.platformName}</strong>
+                              <small>{row.order.accountDisplayName || row.order.accountName || "Konto"}</small>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="text-muted">{row.carrierName}</td>
+                        <td>
+                          <button type="button" className="shipping-tracking-code" disabled={!row.tracking} title={copy.copyTracking} onClick={(event) => { event.stopPropagation(); void copyTracking(row); }}>
+                            {row.tracking || copy.noTracking}
+                          </button>
+                        </td>
+                        <td><ShipmentStatusBadge status={row.shipment.status} copy={copy} /></td>
+                        <td className="text-muted" style={{ fontSize: 12 }}>
+                          {formatShortDate(row.createdAt, locale)}
+                          {row.ageDays != null && <div style={{ fontSize: 11 }}>{copy.days.replace("{n}", String(row.ageDays))}</div>}
+                        </td>
+                        <td style={{ paddingRight: "var(--space-4)", textAlign: "right" }} onClick={(event) => event.stopPropagation()}>
+                          <div className="commerce-actions shipping-actions" style={{ justifyContent: "flex-end" }}>
+                            <button type="button" className="btn btn-ghost btn-icon" disabled={!trackable || rowBusy} title={trackable ? copy.openTracking : copy.trackingUnavailable} onClick={() => void withAction(`${row.key}:track`, () => openTracking(row))}><ExternalLink size={15} /></button>
+                            <button type="button" className="btn btn-ghost btn-icon" disabled={!row.tracking || rowBusy} title={copy.copyTracking} onClick={() => void copyTracking(row)}><Clipboard size={15} /></button>
+                            <button type="button" className="btn btn-ghost btn-icon" disabled={!labelAvailable || rowBusy} title={copy.label} onClick={() => void withAction(`${row.key}:label`, () => openLabel(row))}><FileText size={15} /></button>
+                            <button type="button" className="btn btn-ghost btn-icon" disabled={!labelAvailable || rowBusy} title={copy.print} onClick={() => void withAction(`${row.key}:print`, () => printLabel(row))}><Printer size={15} /></button>
+                            {onOpenOrder && <button type="button" className="btn btn-ghost btn-icon" title={copy.openOrder} onClick={() => onOpenOrder(row.order.id)}><Truck size={15} /></button>}
+                            <button type="button" className="btn btn-ghost" onClick={() => setSelected(row)}>{copy.details}</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {filtered.length === 0 && (
+                <div style={{ padding: 40, textAlign: "center" }} className="text-muted">
+                  <div>{copy.noShipments}</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>{copy.noShipmentsDetail}</div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {!loading && <CommercePagination page={currentPage} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); resetPage(); }} />}
+      </div>
 
       {selected && (
         <CommerceModal title={copy.detailsTitle} onClose={() => setSelected(null)} wide>
@@ -1018,6 +997,6 @@ export default function Shipping({
           </footer>
         </CommerceModal>
       )}
-    </CommercePage>
+    </main>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/serverStatus";
 import type { Order } from "../lib/types";
 import { useI18n, T, translateMessage } from "../lib/i18n";
 import "./ShipmentForm.css";

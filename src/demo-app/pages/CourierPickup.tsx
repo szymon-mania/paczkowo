@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { CalendarClock, Check, MapPin, PackageCheck, Truck } from "lucide-react";
+import { invoke } from "../lib/serverStatus";
+import { CalendarClock, Check, MapPin, PackageCheck, RefreshCw, Truck } from "lucide-react";
 import type { Account } from "../lib/types";
 import CourierAccounts from "../components/CourierAccounts";
 import { CommerceHeader, CommercePage } from "../components/CommerceUi";
@@ -13,6 +13,11 @@ type CarrierGroup = { carrier: string; program?: string; label?: string; shipmen
 type Prep = { groups: CarrierGroup[]; carriers: string[]; address: any };
 type Created = { orderId: string; shipmentId: string; carrier: string; program?: string; waybill?: string; createdDate?: string; canceled: boolean; pickupAvailable: boolean; status: string };
 type Service = { deliveryMethodId?: string; name?: string; carrierId?: string; realCarrier?: string; owner?: string };
+
+/** Ten sam wskaźnik ładowania co na Zamówieniach/Wysyłce. */
+function Spinner() {
+  return <span className="cp-spinner" aria-hidden />;
+}
 
 const norm = (s: string) => (s ?? "").toUpperCase().replace(/[\s_]/g, "");
 const isInpostCarrier = (s: string) => /INPOST|PACZKOMAT/.test(norm(s));
@@ -28,11 +33,27 @@ function nextBusinessDate() {
 }
 
 // Cache modułowy (przeżywa odmontowanie zakładki) — klucz = login konta Allegro.
-type CourierCacheEntry = { created?: Created[]; services?: Service[]; prep?: Prep | null };
+// Zapytania do Allegro są wolne, więc dane młodsze niż TTL wchodzą od razu z pamięci,
+// a wejście na zakładkę nie wywołuje ich ponownie.
+type CourierCacheEntry = { created?: Created[]; services?: Service[]; prep?: Prep | null; dataAt?: number; servicesAt?: number };
 const courierCache: Record<string, CourierCacheEntry> = {};
-let pickupsCache: Pickup[] | null = null;
+let pickupsCache: { items: Pickup[]; at: number } | null = null;
+let integrationsCache: Integration[] | null = null;
+const DATA_TTL_MS = 60_000;
+const SERVICES_TTL_MS = 5 * 60_000;
 function putCache(login: string, patch: CourierCacheEntry) {
   courierCache[login] = { ...(courierCache[login] ?? {}), ...patch };
+}
+const fresh = (at: number | undefined, ttl: number) => at != null && Date.now() - at < ttl;
+
+// Jedno zapytanie na klucz — dwa wejścia w zakładkę nie dublują wolnych requestów.
+const inflight = new Map<string, Promise<unknown>>();
+function once<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const pending = inflight.get(key) as Promise<T> | undefined;
+  if (pending) return pending;
+  const task = run().finally(() => inflight.delete(key));
+  inflight.set(key, task);
+  return task;
 }
 
 function fmt(iso: string | undefined, locale: string) {
@@ -105,8 +126,14 @@ function CarrierMark({ carrier }: { carrier: string }) {
 
 export default function CourierPickup({ accounts }: { accounts: Account[] }) {
   const { t } = useI18n();
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  useEffect(() => { getIntegrations().then(setIntegrations).catch(() => {}); }, []);
+  const [integrations, setIntegrations] = useState<Integration[]>(() => integrationsCache ?? []);
+  const [integrationsLoaded, setIntegrationsLoaded] = useState(() => integrationsCache != null);
+  useEffect(() => {
+    getIntegrations()
+      .then((list) => { integrationsCache = list; setIntegrations(list); })
+      .catch(() => {})
+      .finally(() => setIntegrationsLoaded(true));
+  }, []);
 
   const accountLabels = useMemo(() => {
     const map = new Map<string, string>();
@@ -135,13 +162,17 @@ export default function CourierPickup({ accounts }: { accounts: Account[] }) {
   const pick = (key: string) => { setSelKey(key); localStorage.setItem("courierSource", key); setChoosing(false); };
 
   // Pierwsza konfiguracja: brak wyboru (lub niedostępny) → ekran wyboru źródła.
-  const showChooser = choosing || !sel;
+  // Dopóki konta się wczytują, nie pokazujemy chooserа — inaczej mrugałby przy każdym wejściu.
+  const waitingForSources = !sel && !integrationsLoaded;
+  const showChooser = choosing || (!sel && integrationsLoaded);
 
   return (
     <CommercePage>
         <CommerceHeader title={t(T.nav_courier)} subtitle={t(T.cp_subtitle)} />
 
-        {showChooser ? (
+        {waitingForSources ? (
+          <div className="card elev-sm cp-loading"><Spinner /><span>{t(T.cp_loading_source)}</span></div>
+        ) : showChooser ? (
           <SourceChooser sources={sources} current={selKey} onPick={pick} />
         ) : (
           <>
@@ -227,7 +258,7 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
   const initCache = courierCache[login];
   const [created, setCreated] = useState<Created[]>(initCache?.created ?? []);
   const [createdLoading, setCreatedLoading] = useState(!initCache?.created);
-  const [pickups, setPickups] = useState<Pickup[]>(pickupsCache ?? []);
+  const [pickups, setPickups] = useState<Pickup[]>(pickupsCache?.items ?? []);
 
   const [services, setServices] = useState<Service[]>(initCache?.services ?? []);
   const [servicesLoading, setServicesLoading] = useState(false);
@@ -243,32 +274,40 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  async function loadCourierData() {
+  async function loadCourierData(force = false) {
     if (!login) return;
     const c = courierCache[login];
+    if (!force && fresh(c?.dataAt, DATA_TTL_MS)) { setCreatedLoading(false); setPrepLoading(false); return; }
     if (!c?.created) setCreatedLoading(true);
     if (!c?.prep) setPrepLoading(true);
     try {
-      const d = await invoke<{ created: Created[]; prep: Prep }>("get_courier_data", { login });
+      const d = await once(`courier-data:${login}`, () => invoke<{ created: Created[]; prep: Prep }>("get_courier_data", { login }));
       setCreated(d.created); setPrep(d.prep);
-      putCache(login, { created: d.created, prep: d.prep });
+      putCache(login, { created: d.created, prep: d.prep, dataAt: Date.now() });
     } catch (e) {
       setMsg({ text: t(T.cp_err_load, { e: translateMessage(e, t) }), ok: false });
     } finally {
       setCreatedLoading(false); setPrepLoading(false);
     }
   }
-  async function loadPickups() {
-    try { const p = await invoke<Pickup[]>("get_pickups"); setPickups(p ?? []); pickupsCache = p ?? []; } catch (e) { console.error("get_pickups", e); }
-  }
-  async function loadServices() {
-    if (!login) return;
-    if (!courierCache[login]?.services?.length) setServicesLoading(true);
+  async function loadPickups(force = false) {
+    if (!force && fresh(pickupsCache?.at, DATA_TTL_MS)) return;
     try {
-      const s = await invoke<Service[]>("get_delivery_services", { login });
-      setServices(s); putCache(login, { services: s });
+      const p = await once("pickups", () => invoke<Pickup[]>("get_pickups"));
+      setPickups(p ?? []); pickupsCache = { items: p ?? [], at: Date.now() };
+    } catch (e) { console.error("get_pickups", e); }
+  }
+  async function loadServices(force = false) {
+    if (!login) return;
+    const c = courierCache[login];
+    if (!force && fresh(c?.servicesAt, SERVICES_TTL_MS)) { setServicesLoading(false); return; }
+    if (!c?.services?.length) setServicesLoading(true);
+    try {
+      const s = await once(`services:${login}`, () => invoke<Service[]>("get_delivery_services", { login }));
+      setServices(s); putCache(login, { services: s, servicesAt: Date.now() });
     } catch (e) { console.error("get_delivery_services", e); } finally { setServicesLoading(false); }
   }
+  const refreshAll = () => { void loadCourierData(true); void loadServices(true); void loadPickups(true); };
 
   useEffect(() => {
     const c = courierCache[login];
@@ -369,7 +408,7 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
       const extra = res.pickups && res.pickups > 1 ? t(T.cp_ordered_split, { n: res.pickups }) : "";
       setMsg({ text: t(T.cp_ordered, { carrier, extra, id: res.pickupId }), ok: true });
       setPicked(new Set());
-      loadPickups(); loadCourierData();
+      void loadPickups(true); void loadCourierData(true);
     } catch (e) { setMsg({ text: t(T.common_error_with_message, { message: translateMessage(e, t) }), ok: false }); } finally { setBusy(false); }
   }
 
@@ -393,10 +432,15 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
               onClick={() => setPicked(allPicked ? new Set() : new Set(carrierRows.map((r) => r.shipmentId)))}>
               {allPicked ? t(T.cp_clear_sel) : t(T.cp_select_all)}
             </button>
+            <button type="button" className="cp-linkbtn cp-iconbtn" title={t(T.cp_refresh)} aria-label={t(T.cp_refresh)}
+              disabled={prepLoading || createdLoading} onClick={refreshAll}>
+              <RefreshCw size={14} className={prepLoading || createdLoading ? "spin" : ""} />
+            </button>
           </div>
 
           {rows.length === 0 ? (
-            <div className="cp-empty">{prepLoading ? t(T.cp_checking_parcels) : t(T.cp_no_ready)}</div>
+            prepLoading ? <div className="cp-loading"><Spinner /><span>{t(T.cp_checking_parcels)}</span></div>
+              : <div className="cp-empty">{t(T.cp_no_ready)}</div>
           ) : (
             <div className="cp-rows">
               {rows.map((r) => {
@@ -418,8 +462,11 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
 
         {/* Szczegóły odbioru */}
         <aside className="card elev-sm cp-side">
-          <div className="cp-kicker">{t(T.cp_details_kicker)}</div>
-
+          <div className="cp-head">
+            <CalendarClock size={15} />
+            <h3>{t(T.cp_details_kicker)}</h3>
+          </div>
+          <div className="cp-side-body">
           <div className="cp-field">
             <label>{t(T.cp_col_carrier)}{servicesLoading && carriers.length === 0 ? t(T.cp_loading_suffix) : ""}</label>
             <div className="cp-carriers">
@@ -465,12 +512,17 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
           )}
           {carrierRows.length > 0 && <div className="cp-hint">{t(T.cp_one_carrier_note)}</div>}
           {msg && <div className={`cp-note ${msg.ok ? "good" : "bad"}`}>{msg.text}</div>}
+          </div>
         </aside>
       </div>
 
       {/* Utworzone przesyłki */}
       <div className="card elev-sm courier-table-card">
-        <div className="courier-table-title"><PackageCheck size={15} /><span>{t(T.cp_created_title, { login: accountName })}</span></div>
+        <div className="cp-head">
+          <PackageCheck size={15} />
+          <h3>{t(T.cp_created_title, { login: accountName })}</h3>
+          <span className="cp-count">{createdLoading ? "…" : created.length}</span>
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
@@ -484,7 +536,7 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
             </thead>
             <tbody>
               {createdLoading ? (
-                <tr><td colSpan={5} className="text-muted" style={{ padding: 22, textAlign: "center" }}>{t(T.cp_loading_shipments)}</td></tr>
+                <tr><td colSpan={5}><div className="cp-loading"><Spinner /><span>{t(T.cp_loading_shipments)}</span></div></td></tr>
               ) : created.length === 0 ? (
                 <tr><td colSpan={5} className="text-muted" style={{ padding: 22, textAlign: "center" }}>{t(T.cp_no_created)}</td></tr>
               ) : (
@@ -505,7 +557,11 @@ function AllegroPickupPanel({ login, accountName, accountLabels }: { login: stri
 
       {/* Historia zleceń kuriera */}
       <div className="card elev-sm courier-table-card">
-        <div className="courier-table-title"><CalendarClock size={15} /><span>{t(T.cp_pickups_title)}</span></div>
+        <div className="cp-head">
+          <CalendarClock size={15} />
+          <h3>{t(T.cp_pickups_title)}</h3>
+          <span className="cp-count">{pickups.length}</span>
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>

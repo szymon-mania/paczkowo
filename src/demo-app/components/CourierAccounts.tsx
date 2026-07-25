@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/serverStatus";
 import { ChevronDown, ChevronUp, Truck } from "lucide-react";
 import type { Account } from "../lib/types";
 import { T, translateMessage, useI18n } from "../lib/i18n";
@@ -31,13 +31,13 @@ export default function CourierAccounts({ accounts, accountLabels }: { accounts:
   }
 
   return (
-    <section className="courier-accounts">
-      <div className="courier-section-head">
-        <div>
-          <h3>{t(T.ca_title)}</h3>
-          <p>{t(T.ca_desc)}</p>
-        </div>
+    <section className="card elev-sm courier-accounts">
+      <div className="cp-head">
+        <Truck size={15} />
+        <h3>{t(T.ca_title)}</h3>
+        <span className="cp-count">{accounts.length}</span>
       </div>
+      <p className="cp-subhead">{t(T.ca_desc)}</p>
       <div className="courier-account-list">
         {accounts.length === 0 && <div style={{ padding: 20, color: "var(--muted2)", fontSize: 13 }}>{t(T.ca_no_accounts)}</div>}
         {accounts.map((a) => (
@@ -77,7 +77,7 @@ export default function CourierAccounts({ accounts, accountLabels }: { accounts:
           </div>
         ))}
       </div>
-      {err && <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>{err}</div>}
+      {err && <div className="cp-subhead" style={{ color: "#b91c1c" }}>{err}</div>}
     </section>
   );
 }

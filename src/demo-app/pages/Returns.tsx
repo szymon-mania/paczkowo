@@ -1,32 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, CircleDollarSign, ClipboardCheck, Eye, PackageCheck, Pencil, Plus, RefreshCw, Search, Send, Trash2, X } from "lucide-react";
+import { Check, CircleDollarSign, ClipboardCheck, Copy, DownloadCloud, Eye, FileText, PackageCheck, Pencil, Plus, Printer, Send, Trash2, X } from "lucide-react";
 
 import { CommerceHeader, CommerceModal, CommercePage, CommercePagination, EmptyTable, Field, KpiStrip, StatusPill } from "../components/CommerceUi";
+import { IntegrationImportList, platformLabel as platformName } from "../components/IntegrationImport";
+import { AccountFilterMulti, type ChannelOption } from "../components/ListFilters";
+import { SyncProgressPanel, SyncSummaryBanner, type SyncSummary } from "../components/SyncStatus";
 import ProductThumbs, { ItemThumb } from "../components/ProductThumbs";
-import { deleteReturn, executeReturnRefund, listOrders, listReturns, rejectMarketplaceReturn, saveReturn, syncMarketplaceReturns, transitionReturn, type ReturnCase, type ReturnItem, type ReturnResolution, type ReturnStatus, type SaveReturn } from "../lib/commerceApi";
+import { invoke } from "../lib/serverStatus";
+import { claimReturnCommission, createReturnLabel, deleteReturn, executeReturnRefund, listOrders, listReturns, refreshReturnCommission, rejectMarketplaceReturn, saveReturn, syncMarketplaceReturnPlatform, transitionReturn, type ReturnCase, type ReturnItem, type ReturnLabelAddress, type ReturnResolution, type ReturnStatus, type SaveReturn } from "../lib/commerceApi";
+import { getIntegrations, type Integration } from "../lib/accountApi";
 import { formatCurrencyTotals, formatMoney } from "../lib/commerceFormat";
+import { consumeQuota, quotaState, refundQuota, QUOTA_LIMIT, QUOTA_WINDOW_MS } from "../lib/syncQuota";
+import { classifyServerError } from "../lib/serverStatus";
+import { clearSyncProgress, readSyncProgress, RETURN_SYNC_PROGRESS_KEY, writeSyncProgress, type SyncProgressState, type SyncProgressStep, type SyncStepStatus } from "../lib/syncProgress";
 import { T, translateMessage, useI18n } from "../lib/i18n";
 import type { Order, OrderItem } from "../lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (value: string, days: number) => new Date(new Date(`${value}T12:00:00Z`).getTime() + days * 86400000).toISOString().slice(0, 10);
-const blankItem = (): ReturnItem => ({ name: "", sku: "", quantity: 1, itemCondition: "UNKNOWN", resolution: "REFUND" });
 const asOrderItem = (item: ReturnItem) => ({
   externalOfferId: item.sku ?? item.orderItemId,
   productName: item.name,
   quantity: item.quantity,
   imageUrl: item.imageUrl,
 });
-const blank = (): SaveReturn => {
-  const requestedAt = today();
-  return {
-    externalOrderId: "", customerName: "", customerEmail: "", returnType: "WITHDRAWAL",
-    resolution: "REFUND", reasonCode: "OTHER", reasonDetails: "", requestedAt,
-    refundDueAt: addDays(requestedAt, 14), refundAmount: 0, currency: "PLN",
-    returnCarrier: "", trackingNumber: "", restockPolicy: "INSPECT", notes: "",
-    items: [blankItem()],
-  };
-};
 const editInput = (value: ReturnCase): SaveReturn => ({
   id: value.id, expectedRevision: value.revision, orderDbId: value.orderDbId,
   externalOrderId: value.externalOrderId, customerName: value.customerName,
@@ -38,15 +35,51 @@ const editInput = (value: ReturnCase): SaveReturn => ({
   items: value.items.map((item) => ({ orderItemId: item.orderItemId, sku: item.sku, name: item.name, quantity: item.quantity, itemCondition: item.itemCondition, resolution: item.resolution })),
 });
 
+/** Zwroty pobiera się z tych platform — zgłasza je kupujący, nie sprzedawca. */
+const RETURN_SYNC_PLATFORMS = new Set(["allegro", "erli"]);
+const RETURN_IMPORT_SCOPE = "returns";
+const RETURN_LABEL_ADDRESS_KEY = "returnLabelAddress";
+const STATUS_SEGMENTS: ReturnStatus[] = ["REQUESTED", "AUTHORIZED", "IN_TRANSIT", "RECEIVED", "INSPECTING", "ACCEPTED", "REFUNDED", "REJECTED", "CLOSED"];
+
+// Lista zwrotów przeżywa zmianę zakładki — wejście pokazuje ostatni wynik od razu.
+const RETURNS_TTL_MS = 60_000;
+let returnsCache: { rows: ReturnCase[]; at: number } | null = null;
+let integrationsCache: Integration[] | null = null;
+
+function createReturnSyncSteps(items: Integration[]): SyncProgressStep[] {
+  return items
+    .filter((item) => RETURN_SYNC_PLATFORMS.has(item.platform) && item.status !== "ERROR")
+    .map((item) => {
+      const accountKey = item.accountKey || item.accountName;
+      return {
+        key: `${item.platform}::${accountKey || item.id}`,
+        platform: item.platform,
+        accountKey,
+        accountName: item.accountName,
+        label: `${item.accountName} · ${platformName(item.platform)}`,
+        status: "pending" as const,
+      };
+    });
+}
+
+function readSavedLabelAddress(): ReturnLabelAddress {
+  try {
+    const raw = localStorage.getItem(RETURN_LABEL_ADDRESS_KEY);
+    if (raw) return JSON.parse(raw) as ReturnLabelAddress;
+  } catch { /* uszkodzony wpis — startujemy z pustym adresem */ }
+  return { countryCode: "PL" };
+}
+
 export default function Returns() {
   const { t, lang } = useI18n();
   const locale = lang === "pl" ? "pl-PL" : "en-GB";
-  const [rows, setRows] = useState<ReturnCase[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<ReturnCase[]>(() => returnsCache?.rows ?? []);
+  const [loading, setLoading] = useState(() => returnsCache == null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ReturnStatus | "ALL">("ALL");
+  const [selAccounts, setSelAccounts] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [editing, setEditing] = useState<SaveReturn | null>(null);
@@ -56,14 +89,78 @@ export default function Returns() {
   const [notice, setNotice] = useState("");
   const [rejecting, setRejecting] = useState<{ row: ReturnCase; code: string; reason: string } | null>(null);
   const [confirming, setConfirming] = useState<{ row: ReturnCase; action: "refund" | "close" | "reject" | "delete" } | null>(null);
+  // Pobieranie z integracji — ten sam model co w Ofertach (konto po koncie, z limitem).
+  const [integrations, setIntegrations] = useState<Integration[]>(() => integrationsCache ?? []);
+  const [importOpen, setImportOpen] = useState(false);
+  const [activeImportKey, setActiveImportKey] = useState<string | null>(null);
+  const [quotaVersion, setQuotaVersion] = useState(0);
+  const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(() => readSyncProgress(RETURN_SYNC_PROGRESS_KEY));
+  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [labelFor, setLabelFor] = useState<ReturnCase | null>(null);
+  const [labelAddress, setLabelAddress] = useState<ReturnLabelAddress>(readSavedLabelAddress);
+  const [labelWeight, setLabelWeight] = useState("1");
 
-  const load = () => { setLoading(true); listReturns().then(setRows).catch((value) => setError(translateMessage(value, t))).finally(() => setLoading(false)); };
-  useEffect(load, []);
+  const load = (force = false) => {
+    if (!force && returnsCache && Date.now() - returnsCache.at < RETURNS_TTL_MS) {
+      setRows(returnsCache.rows);
+      setLoading(false);
+      return;
+    }
+    if (!returnsCache) setLoading(true);
+    listReturns()
+      .then((next) => { returnsCache = { rows: next, at: Date.now() }; setRows(next); })
+      .catch((value) => setError(translateMessage(value, t)))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    getIntegrations()
+      .then((list) => { integrationsCache = list; setIntegrations(list); })
+      .catch(() => setIntegrations(integrationsCache ?? []));
+  }, []);
+  const reload = () => load(true);
+
+  const accountKeyOf = (row: ReturnCase) => `${row.sourcePlatform}::${row.accountName ?? ""}`;
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((row) => (status === "ALL" || row.status === status)
+      && (selAccounts.size === 0 || selAccounts.has(accountKeyOf(row)))
       && (!q || `${row.externalOrderId ?? ""} ${row.customerName} ${row.customerEmail ?? ""} ${row.items.map((item) => item.sku ?? item.name).join(" ")}`.toLowerCase().includes(q)));
-  }, [rows, search, status]);
+  }, [rows, search, status, selAccounts]);
+
+  // Liczniki jak w Zamówieniach: każdy filtr liczony bez samego siebie, lista kont pełna.
+  const statusCounts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const scoped = rows.filter((row) => (selAccounts.size === 0 || selAccounts.has(accountKeyOf(row)))
+      && (!q || `${row.externalOrderId ?? ""} ${row.customerName} ${row.customerEmail ?? ""}`.toLowerCase().includes(q)));
+    const counts: Record<string, number> = { ALL: scoped.length };
+    for (const segment of STATUS_SEGMENTS) counts[segment] = scoped.filter((row) => row.status === segment).length;
+    return counts;
+  }, [rows, search, selAccounts]);
+  const accountOptions: ChannelOption[] = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const scoped = rows.filter((row) => (status === "ALL" || row.status === status)
+      && (!q || `${row.externalOrderId ?? ""} ${row.customerName}`.toLowerCase().includes(q)));
+    const counts = new Map<string, number>();
+    for (const row of scoped) counts.set(accountKeyOf(row), (counts.get(accountKeyOf(row)) ?? 0) + 1);
+    const universe = new Map<string, ChannelOption>();
+    for (const row of rows) {
+      const value = accountKeyOf(row);
+      if (universe.has(value)) continue;
+      universe.set(value, {
+        value,
+        platform: row.sourcePlatform,
+        platformLabel: platformName(row.sourcePlatform),
+        accountName: row.accountName ?? "",
+        accountDisplayName: row.accountName || t(T.return_manual),
+        count: 0,
+      });
+    }
+    return [...universe.values()]
+      .map((option) => ({ ...option, count: counts.get(option.value) ?? 0 }))
+      .sort((a, b) => a.platformLabel.localeCompare(b.platformLabel, "pl") || a.accountName.localeCompare(b.accountName, "pl"));
+  }, [rows, search, status, t]);
+
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -89,11 +186,20 @@ export default function Returns() {
     WITHDRAWAL: T.return_type_withdrawal, COMPLAINT: T.return_type_complaint,
     MARKETPLACE_RETURN: T.return_type_marketplace,
   }[value]);
-  const reasonLabel = (value: string) => t({
+  // Allegro zwraca 17 powodów zwrotu — mapujemy wszystkie, żeby nie pokazywać „Inny".
+  const REASON_LABELS: Record<string, T> = {
     CHANGED_MIND: T.return_reason_changed, DAMAGED: T.return_reason_damaged,
     NOT_AS_DESCRIBED: T.return_reason_description, WRONG_ITEM: T.return_reason_wrong,
-    OTHER: T.return_reason_other,
-  }[value as "CHANGED_MIND" | "DAMAGED" | "NOT_AS_DESCRIBED" | "WRONG_ITEM" | "OTHER"] ?? T.return_reason_other);
+    OTHER: T.return_reason_other, NONE: T.return_reason_none, MISTAKE: T.return_reason_mistake,
+    TRANSPORT: T.return_reason_transport, DONT_LIKE_IT: T.return_reason_dont_like,
+    OVERDUE_DELIVERY: T.return_reason_overdue, INCOMPLETE: T.return_reason_incomplete,
+    HIDDEN_FLAW: T.return_reason_hidden_flaw, OTHER_FLAW: T.return_reason_other_flaw,
+    DIFFERENT: T.return_reason_different, COUNTERFEIT: T.return_reason_counterfeit,
+    NOT_NEW: T.return_reason_not_new, TOO_LARGE: T.return_reason_too_large,
+    TOO_SMALL: T.return_reason_too_small, NOT_AS_EXPECTED: T.return_reason_not_expected,
+    ORDERED_FOR_COMPARISON: T.return_reason_comparison,
+  };
+  const reasonLabel = (value: string) => t(REASON_LABELS[value] ?? T.return_reason_other);
   const conditionLabel = (value: string) => t({
     UNKNOWN: T.return_condition_unknown, NEW: T.return_condition_new,
     OPENED: T.return_condition_opened, USED: T.return_condition_used,
@@ -104,7 +210,11 @@ export default function Returns() {
     QUARANTINE: T.return_restock_quarantine, DISPOSE: T.return_restock_dispose,
     RETURN_TO_SUPPLIER: T.return_restock_supplier,
   }[value]);
-  const platformLabel = (value: string) => value === "manual" ? t(T.return_manual) : value === "allegro" ? "Allegro" : value === "erli" ? "ERLI" : value;
+  const commissionLabel = (value?: string) => value === "GRANTED" ? t(T.return_commission_granted)
+    : value === "REJECTED" ? t(T.return_commission_rejected)
+      : value === "CANCELLED" ? t(T.return_commission_cancelled)
+        : t(T.return_commission_in_progress);
+  const platformLabel = (value: string) => value === "manual" ? t(T.return_manual) : platformName(value);
   const date = (value?: string, withTime = false) => {
     if (!value) return "-";
     const parsed = new Date(value.length === 10 ? `${value}T12:00:00` : value);
@@ -125,28 +235,107 @@ export default function Returns() {
   const submit = async () => {
     if (!editing) return;
     setBusy(true); setError("");
-    try { await saveReturn(editing); setEditing(null); load(); }
+    try { await saveReturn(editing); setEditing(null); reload(); }
     catch (value) { setError(translateMessage(value, t)); }
     finally { setBusy(false); }
   };
   const act = async (id: number, next: ReturnStatus) => {
     setBusy(true); setError("");
-    try { await transitionReturn(id, next); load(); }
+    try { await transitionReturn(id, next); reload(); }
     catch (value) { setError(translateMessage(value, t)); }
     finally { setBusy(false); }
   };
-  const sync = async () => {
-    setBusy(true); setError(""); setNotice("");
+
+  // Pobranie zwrotów dla wybranych kont: jedno konto = jedno użycie limitu.
+  const runImport = async (accounts: Integration[]) => {
+    const steps = createReturnSyncSteps(accounts).filter((step) => quotaState(RETURN_IMPORT_SCOPE, step.accountKey || "").remaining > 0);
+    if (steps.length === 0) return;
+
+    const finishImport = (summary: SyncSummary | null) => {
+      clearSyncProgress(RETURN_SYNC_PROGRESS_KEY);
+      setSyncProgress(null);
+      setSyncSummary(summary);
+      setQuotaVersion((value) => value + 1);
+    };
+
+    setBusy(true); setError(""); setNotice(""); setSyncSummary(null);
     try {
-      const result = await syncMarketplaceReturns();
-      setNotice(t(T.return_sync_result).replace("{saved}", String(result.saved)).replace("{pending}", String(result.pendingRefunds)));
-      load();
-    } catch (value) { setError(translateMessage(value, t)); }
-    finally { setBusy(false); }
+      let saved = 0;
+      let pending = 0;
+      const failures: string[] = [];
+      let progress: SyncProgressState = {
+        title: t(T.return_import_title),
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+        steps,
+        fetched: 0,
+        saved: 0,
+        accountsSynced: 0,
+      };
+      const publishProgress = (next: SyncProgressState) => {
+        progress = { ...next, updatedAt: Date.now() };
+        setSyncProgress(progress);
+        writeSyncProgress(RETURN_SYNC_PROGRESS_KEY, progress);
+      };
+      const markStep = (key: string, stepStatus: SyncStepStatus, detail?: string) => {
+        publishProgress({ ...progress, steps: progress.steps.map((step) => step.key === key ? { ...step, status: stepStatus, detail } : step) });
+      };
+
+      publishProgress(progress);
+      for (const step of steps) {
+        const account = step.accountKey || "";
+        if (!consumeQuota(RETURN_IMPORT_SCOPE, account)) continue;
+        setActiveImportKey(account);
+        markStep(step.key, "active");
+        try {
+          const result = await syncMarketplaceReturnPlatform(step.platform, step.accountKey);
+          saved += result.saved;
+          pending = Math.max(pending, result.pendingRefunds);
+          publishProgress({
+            ...progress,
+            fetched: progress.fetched + result.fetched,
+            saved,
+            accountsSynced: progress.accountsSynced + result.accountsSynced,
+            steps: progress.steps.map((item) => item.key === step.key
+              ? { ...item, status: "done" as SyncStepStatus, detail: lang === "pl" ? `${result.saved} zapis. / ${result.fetched} pobr.` : `${result.saved} saved / ${result.fetched} fetched` }
+              : item),
+          });
+        } catch (value) {
+          refundQuota(RETURN_IMPORT_SCOPE, account);
+          if (classifyServerError(value) === "unavailable") { finishImport(null); return; }
+          const detail = translateMessage(value, t);
+          failures.push(`${step.label}: ${detail}`);
+          markStep(step.key, "error", detail);
+        }
+      }
+
+      finishImport(failures.length > 0
+        ? { ok: false, title: t(T.sync_failed_title), detail: failures.join(" | "), at: Date.now() }
+        : { ok: true, title: t(T.sync_done_title), detail: t(T.return_sync_result).replace("{saved}", String(saved)).replace("{pending}", String(pending)), at: Date.now() });
+      reload();
+    } finally { setActiveImportKey(null); setBusy(false); }
   };
+
+  const importAccounts = integrations.filter((item) => RETURN_SYNC_PLATFORMS.has(item.platform));
+  const importableNow = importAccounts.filter((item) => item.status !== "ERROR"
+    && quotaState(RETURN_IMPORT_SCOPE, item.accountKey || item.accountName).remaining > 0);
+  const nothingImportedYet = rows.length === 0 && !search.trim() && status === "ALL" && selAccounts.size === 0;
+
   const refund = async (row: ReturnCase) => {
     setBusy(true); setError("");
-    try { await executeReturnRefund(row.id); load(); }
+    try { await executeReturnRefund(row.id); reload(); }
+    catch (value) { setError(translateMessage(value, t)); }
+    finally { setBusy(false); }
+  };
+  const claimCommission = async (row: ReturnCase) => {
+    setBusy(true); setError(""); setNotice("");
+    try { await claimReturnCommission(row.id); setNotice(t(T.return_commission_claimed_toast)); reload(); }
+    catch (value) { setError(translateMessage(value, t)); }
+    finally { setBusy(false); }
+  };
+  const refreshCommission = async (row: ReturnCase) => {
+    setBusy(true); setError("");
+    try { await refreshReturnCommission(row.id); reload(); }
     catch (value) { setError(translateMessage(value, t)); }
     finally { setBusy(false); }
   };
@@ -160,7 +349,7 @@ export default function Returns() {
     else if (current.action === "reject") await act(current.row.id, "REJECTED");
     else {
       setBusy(true); setError("");
-      try { await deleteReturn(current.row.id); load(); }
+      try { await deleteReturn(current.row.id); reload(); }
       catch (value) { setError(translateMessage(value, t)); }
       finally { setBusy(false); }
     }
@@ -168,10 +357,35 @@ export default function Returns() {
   const reject = async () => {
     if (!rejecting) return;
     setBusy(true); setError("");
-    try { await rejectMarketplaceReturn(rejecting.row.id, rejecting.code, rejecting.reason || undefined); setRejecting(null); load(); }
+    try { await rejectMarketplaceReturn(rejecting.row.id, rejecting.code, rejecting.reason || undefined); setRejecting(null); reload(); }
     catch (value) { setError(translateMessage(value, t)); }
     finally { setBusy(false); }
   };
+
+  const copyToClipboard = async (value: string) => {
+    try { await navigator.clipboard.writeText(value); setNotice(t(T.return_bank_copied)); }
+    catch { /* schowek niedostępny — użytkownik przepisze ręcznie */ }
+  };
+  const openLabel = async (path: string) => { try { await invoke("open_file", { path }); } catch (value) { setError(translateMessage(value, t)); } };
+  const printLabel = async (path: string) => { try { await invoke("print_label", { pdfPath: path, printerName: null }); } catch (value) { setError(translateMessage(value, t)); } };
+  const submitLabel = async () => {
+    if (!labelFor) return;
+    setBusy(true); setError("");
+    try {
+      localStorage.setItem(RETURN_LABEL_ADDRESS_KEY, JSON.stringify(labelAddress));
+      const result = await createReturnLabel({
+        returnId: labelFor.id,
+        receiver: labelAddress,
+        weightKg: Number(labelWeight) > 0 ? Number(labelWeight) : 1,
+      });
+      setNotice(t(T.return_label_created, { tracking: result.trackingNumber }));
+      setLabelFor(null);
+      reload();
+    } catch (value) { setError(translateMessage(value, t)); }
+    finally { setBusy(false); }
+  };
+  const labelReady = Boolean(labelAddress.targetPoint?.trim()
+    || (labelAddress.street?.trim() && labelAddress.city?.trim() && labelAddress.postCode?.trim()));
 
   const openDetails = (row: ReturnCase) => {
     setDetails(row);
@@ -195,6 +409,10 @@ export default function Returns() {
     if (row.status === "REFUNDED" || row.status === "REJECTED") buttons.push({ next: "CLOSED", icon: Check, label: T.return_action_close });
     return buttons;
   };
+  /** Zwrot prowizji ma sens dopiero, gdy towar wrócił i sprawa idzie ku zamknięciu. */
+  const canClaimCommission = (row: ReturnCase) => row.sourcePlatform === "allegro"
+    && !row.commissionClaimIds
+    && ["ACCEPTED", "REFUNDED", "CLOSED"].includes(row.status);
   const detailTimeline = (row: ReturnCase, order?: Order | null) => {
     const products = row.items.map((item) => item.name + (item.quantity > 1 ? " x" + item.quantity : "")).join(", ");
     const events: { at?: string; title: string; detail?: string }[] = [];
@@ -245,7 +463,13 @@ export default function Returns() {
 
   return (
     <CommercePage>
-      <CommerceHeader title={t(T.nav_returns)} subtitle={t(T.return_subtitle)} action={<div className="commerce-header-actions"><button type="button" className="btn btn-secondary" disabled={busy} onClick={sync}><RefreshCw size={15} className={busy ? "spin" : ""} />{t(T.return_sync)}</button><button type="button" className="btn btn-primary" onClick={() => setEditing(blank())}><Plus size={15} />{t(T.return_add)}</button></div>} />
+      <CommerceHeader title={t(T.nav_returns)} subtitle={t(T.return_subtitle)} action={<div className="commerce-header-actions">
+        <button type="button" className="btn btn-primary ord-sync-button" disabled={busy} onClick={() => setImportOpen(true)}>
+          <DownloadCloud size={15} className={activeImportKey ? "spin" : ""} />{t(T.return_import_open)}
+        </button>
+        {syncProgress && <SyncProgressPanel progress={syncProgress} />}
+      </div>} />
+      {syncSummary && <SyncSummaryBanner summary={syncSummary} onDismiss={() => setSyncSummary(null)} />}
       <KpiStrip items={[
         { label: t(T.return_kpi_open), value: open },
         { label: t(T.return_kpi_received), value: received, tone: received ? "warn" : "default" },
@@ -254,32 +478,123 @@ export default function Returns() {
       ]} />
       {error && <div className="commerce-alert danger">{error}</div>}
       {notice && <div className="commerce-alert good">{notice}</div>}
-      <section className="commerce-toolbar">
-        <div className="commerce-search"><Search size={15} /><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t(T.return_search)} /></div>
-        <div className="seg">{(["ALL", "REQUESTED", "AUTHORIZED", "RECEIVED", "ACCEPTED", "REFUNDED", "CLOSED"] as const).map((value) => <button type="button" key={value} className={`commerce-seg-btn${status === value ? " active" : ""}`} onClick={() => { setStatus(value); setPage(1); }}>{value === "ALL" ? t(T.common_all) : statusLabel(value)}</button>)}</div>
-      </section>
-      <section className="commerce-table-wrap">
-        {loading ? <div className="commerce-loading">{t(T.common_loading)}</div> : filtered.length === 0 ? <EmptyTable title={t(T.return_empty)} detail={t(T.return_empty_detail)} /> : (
-          <table className="table commerce-table"><thead><tr><th>{t(T.return_col_case)}</th><th>{t(T.return_col_customer)}</th><th>{t(T.return_col_status)}</th><th>{t(T.return_col_resolution)}</th><th>{t(T.return_col_deadline)}</th><th>{t(T.return_col_amount)}</th><th /></tr></thead>
+
+      {/* Filtry: szukaj + status + konto — układ wspólny z Zamówieniami/Wysyłką */}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
+        <div className="field" style={{ maxWidth: 280, flex: 1, minWidth: 200 }}>
+          <label htmlFor="return-search">{t(T.common_search)}</label>
+          <input className="input" id="return-search" placeholder={t(T.return_search)} value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+        </div>
+        <div className="field">
+          <label id="return-status-label">{t(T.ord_status)}</label>
+          <div className="seg" role="radiogroup" aria-labelledby="return-status-label">
+            {STATUS_SEGMENTS.map((value) => (
+              <label key={value} className="seg-opt">
+                <input type="radio" name="returnstatusf" checked={status === value} onChange={() => { setStatus(value); setPage(1); }} />
+                {statusLabel(value)}<span className="seg-count">{statusCounts[value] ?? 0}</span>
+              </label>
+            ))}
+            <label className="seg-opt">
+              <input type="radio" name="returnstatusf" checked={status === "ALL"} onChange={() => { setStatus("ALL"); setPage(1); }} />
+              {t(T.common_all)}<span className="seg-count">{statusCounts.ALL ?? 0}</span>
+            </label>
+          </div>
+        </div>
+        <div className="field" style={{ maxWidth: 230 }}>
+          <label htmlFor="return-account">{t(T.dash_by_account)}</label>
+          <AccountFilterMulti id="return-account" selected={selAccounts} options={accountOptions} onChange={(next) => { setSelAccounts(next); setPage(1); }} />
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="card elev-sm" style={{ padding: 0, overflowX: "auto" }}>
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220 }}>
+            <div style={{ width: 24, height: 24, border: "3px solid var(--accent)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          </div>
+        ) : filtered.length === 0 ? (
+          nothingImportedYet ? (
+            <div className="offer-import-empty">
+              <header>
+                <strong>{t(T.return_import_empty_title)}</strong>
+                <span>{t(T.return_import_empty_detail)}</span>
+              </header>
+              <IntegrationImportList
+                accounts={importAccounts}
+                busy={busy}
+                activeKey={activeImportKey}
+                onImport={(account) => void runImport([account])}
+                locale={locale}
+                quotaVersion={quotaVersion}
+                scope={RETURN_IMPORT_SCOPE}
+                emptyLabel={t(T.return_import_no_accounts)}
+                actionLabel={t(T.return_import_account)}
+              />
+              <div className="offer-import-hint">{t(T.offer_import_quota_hint, { max: QUOTA_LIMIT, hours: QUOTA_WINDOW_MS / 3_600_000 })}</div>
+            </div>
+          ) : <EmptyTable title={t(T.return_empty)} detail={t(T.return_empty_detail)} />
+        ) : (
+          <table className="table commerce-table" style={{ fontSize: 14 }}>
+            <thead><tr>
+              <th style={{ paddingLeft: "var(--space-4)" }}>{t(T.return_col_case)}</th>
+              <th>{t(T.return_col_customer)}</th>
+              <th>{t(T.return_col_status)}</th>
+              <th>{t(T.return_col_resolution)}</th>
+              <th>{t(T.return_col_deadline)}</th>
+              <th className="ord-th-num">{t(T.return_col_amount)}</th>
+              <th style={{ paddingRight: "var(--space-4)" }} />
+            </tr></thead>
             <tbody>{visible.map((row) => <tr key={row.id}>
-              <td><strong>{platformLabel(row.sourcePlatform)}</strong><span className="commerce-subline">{t(T.return_field_requested)}: {date(row.requestedAt)}</span></td>
+              <td style={{ paddingLeft: "var(--space-4)" }}><strong>{platformLabel(row.sourcePlatform)}</strong><span className="commerce-subline">{row.accountName ? `${row.accountName} · ` : ""}{date(row.requestedAt)}</span></td>
               <td><div className="return-list-products"><ProductThumbs items={row.items.map(asOrderItem)} fit="contain" /><div><strong>{row.customerName}</strong><span className="commerce-subline">{row.items.map((item) => item.name).slice(0, 2).join(", ")}</span></div></div></td>
-              <td><StatusPill tone={row.refundStatus === "FAILED" ? "danger" : tone(row.status)}>{statusLabel(row.status)}</StatusPill>{row.refundStatus === "FAILED" && <span className="commerce-subline commerce-danger-text" title={row.refundError}>{t(T.return_refund_attention)}</span>}</td>
-              <td>{resolutionLabel(row.resolution)}</td>
+              <td>
+                <StatusPill tone={row.refundStatus === "FAILED" ? "danger" : tone(row.status)}>{statusLabel(row.status)}</StatusPill>
+                {row.refundStatus === "FAILED" && <span className="commerce-subline commerce-danger-text" title={row.refundError}>{t(T.return_refund_attention)}</span>}
+                {row.refundBankAccount?.accountNumber && row.refundStatus === "PENDING" && <span className="commerce-subline">{t(T.return_bank_section)}</span>}
+              </td>
+              <td>{resolutionLabel(row.resolution)}{row.commissionClaimStatus && <span className="commerce-subline">{t(T.return_commission_section)}: {commissionLabel(row.commissionClaimStatus)}</span>}</td>
               <td className={row.refundStatus === "PENDING" && row.refundDueAt && row.refundDueAt < today() ? "commerce-danger-text" : ""}>{date(row.refundDueAt)}</td>
-              <td className="commerce-num">{money(row.refundAmount, row.currency)}</td>
-              <td><div className="commerce-actions">
+              <td className="ord-td-num">{money(row.refundAmount, row.currency)}</td>
+              <td style={{ paddingRight: "var(--space-4)" }}><div className="commerce-actions" style={{ justifyContent: "flex-end" }}>
                 <button type="button" className="btn btn-ghost btn-icon" title={t(T.return_details)} onClick={() => openDetails(row)}><Eye size={15} /></button>
-                {(row.status === "REQUESTED" && row.sourcePlatform === "manual" || ["RECEIVED", "INSPECTING"].includes(row.status)) && <button type="button" className="btn btn-ghost btn-icon" title={t(T.common_edit)} onClick={() => setEditing(editInput(row))}><Pencil size={15} /></button>}
+                {row.returnLabelPath
+                  ? <button type="button" className="btn btn-ghost btn-icon" title={t(T.return_label_open)} onClick={() => void openLabel(row.returnLabelPath!)}><FileText size={15} /></button>
+                  : ["REQUESTED", "AUTHORIZED"].includes(row.status) && <button type="button" className="btn btn-ghost btn-icon" title={t(T.return_label_create)} onClick={() => setLabelFor(row)}><Printer size={15} /></button>}
+                {(["RECEIVED", "INSPECTING"].includes(row.status)) && <button type="button" className="btn btn-ghost btn-icon" title={t(T.common_edit)} onClick={() => setEditing(editInput(row))}><Pencil size={15} /></button>}
                 {actions(row).map(({ next, icon: Icon, label }) => <button type="button" key={next} className="btn btn-ghost btn-icon" title={t(label)} disabled={busy} onClick={() => next === "CLOSED" ? setConfirming({ row, action: "close" }) : act(row.id, next)}><Icon size={15} /></button>)}
                 {["REQUESTED", "INSPECTING"].includes(row.status) && <button type="button" className="btn btn-ghost btn-icon danger" title={t(T.return_action_reject)} onClick={() => setConfirming({ row, action: "reject" })}><X size={15} /></button>}
                 {row.sourcePlatform === "allegro" && row.status === "ACCEPTED" && ["REFUND", "PARTIAL_REFUND"].includes(row.resolution) && row.refundStatus === "PENDING" && <button type="button" className="btn btn-ghost btn-icon" title={t(T.return_action_refund)} disabled={busy} onClick={() => setConfirming({ row, action: "refund" })}><CircleDollarSign size={15} /></button>}
                 {row.status === "REQUESTED" && row.sourcePlatform === "manual" && <button type="button" className="btn btn-ghost btn-icon danger" title={t(T.return_action_delete)} onClick={() => setConfirming({ row, action: "delete" })}><Trash2 size={15} /></button>}
               </div></td>
-            </tr>)}</tbody></table>
+            </tr>)}</tbody>
+          </table>
         )}
-      </section>
+      </div>
       {!loading && <CommercePagination page={currentPage} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />}
+
+      {importOpen && <CommerceModal title={t(T.return_import_title)} onClose={() => setImportOpen(false)}>
+        <div className="offer-create-panel">
+          <p>{t(T.return_import_subtitle)}</p>
+          <IntegrationImportList
+            accounts={importAccounts}
+            busy={busy}
+            activeKey={activeImportKey}
+            onImport={(account) => void runImport([account])}
+            locale={locale}
+            quotaVersion={quotaVersion}
+            scope={RETURN_IMPORT_SCOPE}
+            emptyLabel={t(T.return_import_no_accounts)}
+            actionLabel={t(T.return_import_account)}
+          />
+          <div className="offer-import-hint">{t(T.offer_import_quota_hint, { max: QUOTA_LIMIT, hours: QUOTA_WINDOW_MS / 3_600_000 })}</div>
+        </div>
+        <footer className="commerce-modal-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(false)}>{t(T.common_close)}</button>
+          <button type="button" className="btn btn-primary" disabled={busy || importableNow.length === 0} onClick={() => void runImport(importableNow)}>
+            <DownloadCloud size={15} />{t(T.return_import_all, { n: importableNow.length })}
+          </button>
+        </footer>
+      </CommerceModal>}
 
       {confirming && (
         <CommerceModal title={confirmTitle} onClose={() => setConfirming(null)}>
@@ -295,6 +610,28 @@ export default function Returns() {
           </footer>
         </CommerceModal>
       )}
+
+      {labelFor && <CommerceModal title={t(T.return_label_section)} onClose={() => setLabelFor(null)}>
+        <p className="offer-import-hint" style={{ marginBottom: 12 }}>{t(T.return_label_hint)}</p>
+        <div className="commerce-form-grid">
+          <div className="commerce-form-section">{t(T.return_label_receiver)}</div>
+          <Field label={t(T.return_label_company)}><input className="input" value={labelAddress.companyName ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, companyName: e.target.value })} /></Field>
+          <Field label={t(T.return_label_person)}><input className="input" value={labelAddress.name ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, name: e.target.value })} /></Field>
+          <Field label={t(T.return_label_street)}><input className="input" value={labelAddress.street ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, street: e.target.value })} /></Field>
+          <Field label={t(T.return_label_city)}><input className="input" value={labelAddress.city ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, city: e.target.value })} /></Field>
+          <Field label={t(T.return_label_post_code)}><input className="input" value={labelAddress.postCode ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, postCode: e.target.value })} /></Field>
+          <Field label={t(T.return_label_phone)}><input className="input" value={labelAddress.phone ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, phone: e.target.value })} /></Field>
+          <Field label={t(T.return_label_email)}><input className="input" type="email" value={labelAddress.email ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, email: e.target.value })} /></Field>
+          <Field label={t(T.return_label_point)}><input className="input" placeholder="np. KRA01A" value={labelAddress.targetPoint ?? ""} onChange={(e) => setLabelAddress({ ...labelAddress, targetPoint: e.target.value })} /></Field>
+          <div className="commerce-form-section">{t(T.return_label_parcel)}</div>
+          <Field label={t(T.return_label_weight)}><input className="input" type="number" min="0.1" step="0.1" value={labelWeight} onChange={(e) => setLabelWeight(e.target.value)} /></Field>
+          <div style={{ gridColumn: "1 / -1" }} className="offer-import-hint">{t(T.return_label_point_hint)} {t(T.return_label_remember)}</div>
+        </div>
+        <footer className="commerce-modal-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => setLabelFor(null)}>{t(T.common_cancel)}</button>
+          <button type="button" className="btn btn-primary" disabled={busy || !labelReady} onClick={submitLabel}>{busy ? t(T.common_please_wait) : t(T.return_label_create)}</button>
+        </footer>
+      </CommerceModal>}
 
       {details && <CommerceModal title={t(T.return_details)} onClose={() => { setDetails(null); setOrderDetails(null); }} wide>
         <div className="return-detail">
@@ -323,6 +660,30 @@ export default function Returns() {
                 <div><span>{t(T.return_field_restock)}</span><strong>{restockLabel(details.restockPolicy)}</strong></div>
                 {details.reasonDetails && <p>{details.reasonDetails}</p>}
               </section>
+
+              {/* Zwrot przelewem: przy pobraniu/przelewie API nie ma czego cofnąć. */}
+              {details.refundBankAccount?.accountNumber && (
+                <section className="return-detail-panel return-detail-facts">
+                  <h4>{t(T.return_bank_section)}</h4>
+                  <p>{t(T.return_bank_hint)}</p>
+                  <div><span>{t(T.return_bank_owner)}</span><strong>{details.refundBankAccount.owner ?? "-"}</strong></div>
+                  <div><span>{t(T.return_bank_number)}</span><strong>{details.refundBankAccount.iban ?? details.refundBankAccount.accountNumber}</strong></div>
+                  {details.refundBankAccount.address && <div><span>{t(T.return_field_customer)}</span><strong>{details.refundBankAccount.address}</strong></div>}
+                  <div className="return-detail-actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => void copyToClipboard(details.refundBankAccount?.iban ?? details.refundBankAccount?.accountNumber ?? "")}>
+                      <Copy size={15} />{t(T.return_bank_copy)}
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {details.rejectionCode && (
+                <section className="return-detail-panel return-detail-facts">
+                  <h4>{t(T.return_rejection_section)}</h4>
+                  <div><span>{t(T.return_rejection_code)}</span><strong>{details.rejectionCode}</strong></div>
+                  {details.rejectionReason && <p>{details.rejectionReason}</p>}
+                </section>
+              )}
             </div>
             <aside className="return-order-aside">
               <section className="return-detail-panel return-detail-facts">
@@ -331,6 +692,38 @@ export default function Returns() {
                 <div><span>{t(T.return_field_requested)}</span><strong>{date(linkedOrder?.orderCreatedAt ?? details.requestedAt, true)}</strong></div>
                 {linkedOrder && <><div><span>{t(T.od_total)}</span><strong>{money(Number(linkedOrder.totalToPay ?? 0), linkedOrder.currency ?? details.currency)}</strong></div><div><span>{t(T.od_payment)}</span><strong>{linkedOrder.paymentFinishedAt ? t(T.od_hist_paid) : linkedOrder.paymentProvider ?? linkedOrder.paymentType ?? "-"}</strong></div><div><span>{t(T.od_delivery)}</span><strong>{linkedOrder.deliveryMethodName ?? linkedOrder.carrier ?? t(T.return_detail_no_tracking)}</strong></div></>}
               </section>
+
+              {/* Etykieta zwrotna — Allegro nie wystawia jej przez API, robimy z własnej umowy. */}
+              <section className="return-detail-panel return-detail-facts">
+                <h4>{t(T.return_label_section)}</h4>
+                {details.returnLabelTracking
+                  ? <div><span>{t(T.return_field_tracking)}</span><strong>{details.returnLabelTracking}</strong></div>
+                  : <p>{t(T.return_label_hint)}</p>}
+                <div className="return-detail-actions">
+                  {details.returnLabelPath ? <>
+                    <button type="button" className="btn btn-secondary" onClick={() => void openLabel(details.returnLabelPath!)}><FileText size={15} />{t(T.return_label_open)}</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => void printLabel(details.returnLabelPath!)}><Printer size={15} />{t(T.return_label_print)}</button>
+                  </> : (
+                    <button type="button" className="btn btn-secondary" onClick={() => { setLabelFor(details); }}><Printer size={15} />{t(T.return_label_create)}</button>
+                  )}
+                </div>
+              </section>
+
+              {/* Rabat transakcyjny — realne pieniądze, które inaczej przepadają. */}
+              {details.sourcePlatform === "allegro" && (
+                <section className="return-detail-panel return-detail-facts">
+                  <h4>{t(T.return_commission_section)}</h4>
+                  {details.commissionClaimIds
+                    ? <div><span>{t(T.return_commission_status)}</span><strong>{commissionLabel(details.commissionClaimStatus)}</strong></div>
+                    : <p>{t(T.return_commission_hint)}</p>}
+                  <div className="return-detail-actions">
+                    {details.commissionClaimIds
+                      ? <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void refreshCommission(details)}><CircleDollarSign size={15} />{t(T.return_commission_refresh)}</button>
+                      : <button type="button" className="btn btn-secondary" disabled={busy || !canClaimCommission(details)} onClick={() => void claimCommission(details)}><CircleDollarSign size={15} />{t(T.return_commission_claim)}</button>}
+                  </div>
+                </section>
+              )}
+
               <section className="return-detail-panel return-detail-facts">
                 <h4>{t(T.return_section_customer)}</h4>
                 <div><span>{t(T.return_field_customer)}</span><strong>{details.customerName}</strong></div>
@@ -349,31 +742,23 @@ export default function Returns() {
           </div>
         </div>
         <footer className="commerce-modal-actions">
-          {(details.status === "REQUESTED" && details.sourcePlatform === "manual" || ["RECEIVED", "INSPECTING"].includes(details.status)) && <button type="button" className="btn btn-secondary" onClick={() => { setDetails(null); setOrderDetails(null); setEditing(editInput(details)); }}><Pencil size={15} />{t(T.common_edit)}</button>}
+          {["RECEIVED", "INSPECTING"].includes(details.status) && <button type="button" className="btn btn-secondary" onClick={() => { setDetails(null); setOrderDetails(null); setEditing(editInput(details)); }}><Pencil size={15} />{t(T.common_edit)}</button>}
           <button type="button" className="btn btn-primary" onClick={() => { setDetails(null); setOrderDetails(null); }}>{t(T.common_close)}</button>
         </footer>
       </CommerceModal>}
 
-      {editing && <CommerceModal title={editing.id ? t(T.return_edit) : t(T.return_add)} onClose={() => setEditing(null)} wide>
+      {/* Edycja = praca magazynu po przyjęciu paczki (stan towaru, decyzja, notatki). */}
+      {editing && <CommerceModal title={t(T.return_edit)} onClose={() => setEditing(null)} wide>
         <div className="commerce-form-grid">
           <div className="commerce-form-section">{t(T.return_section_case)}</div>
-          <Field label={t(T.return_field_order)}><input className="input" value={editing.externalOrderId ?? ""} onChange={(e) => setEditing({ ...editing, externalOrderId: e.target.value })} /></Field>
-          <Field label={t(T.return_field_type)}><select className="input" value={editing.returnType} onChange={(e) => setEditing({ ...editing, returnType: e.target.value as SaveReturn["returnType"] })}><option value="WITHDRAWAL">{t(T.return_type_withdrawal)}</option><option value="COMPLAINT">{t(T.return_type_complaint)}</option><option value="MARKETPLACE_RETURN">{t(T.return_type_marketplace)}</option></select></Field>
-          <Field label={t(T.return_field_requested)}><input className="input" type="date" value={editing.requestedAt} onChange={(e) => setEditing({ ...editing, requestedAt: e.target.value, refundDueAt: ["REFUND", "PARTIAL_REFUND"].includes(editing.resolution) && e.target.value ? addDays(e.target.value, 14) : undefined })} /></Field>
           <Field label={t(T.return_field_resolution)}><select className="input" value={editing.resolution} onChange={(e) => { const resolution = e.target.value as ReturnResolution; setEditing({ ...editing, resolution, refundDueAt: ["REFUND", "PARTIAL_REFUND"].includes(resolution) ? editing.refundDueAt ?? addDays(editing.requestedAt, 14) : undefined }); }}><option value="REFUND">{t(T.return_resolution_refund)}</option><option value="PARTIAL_REFUND">{t(T.return_resolution_partial)}</option><option value="REPLACEMENT">{t(T.return_resolution_replacement)}</option><option value="REPAIR">{t(T.return_resolution_repair)}</option><option value="STORE_CREDIT">{t(T.return_resolution_credit)}</option><option value="PENDING">{t(T.return_resolution_pending)}</option></select></Field>
-          <Field label={t(T.return_field_reason)}><select className="input" value={editing.reasonCode} onChange={(e) => setEditing({ ...editing, reasonCode: e.target.value })}><option value="CHANGED_MIND">{t(T.return_reason_changed)}</option><option value="DAMAGED">{t(T.return_reason_damaged)}</option><option value="NOT_AS_DESCRIBED">{t(T.return_reason_description)}</option><option value="WRONG_ITEM">{t(T.return_reason_wrong)}</option><option value="OTHER">{t(T.return_reason_other)}</option></select></Field>
           <Field label={t(T.return_field_amount)}><input className="input" type="number" min="0" step="0.01" value={editing.refundAmount} onChange={(e) => setEditing({ ...editing, refundAmount: Number(e.target.value) })} /></Field>
-          <Field label={t(T.return_field_currency)}><select className="input" value={editing.currency} onChange={(e) => setEditing({ ...editing, currency: e.target.value })}><option>PLN</option><option>EUR</option><option>USD</option><option>GBP</option><option>CZK</option></select></Field>
           {["REFUND", "PARTIAL_REFUND"].includes(editing.resolution) && <Field label={t(T.return_field_refund_due)}><input className="input" type="date" value={editing.refundDueAt ?? ""} onChange={(e) => setEditing({ ...editing, refundDueAt: e.target.value })} /></Field>}
-          <Field label={t(T.return_field_details)} span={2}><textarea className="input commerce-textarea" value={editing.reasonDetails ?? ""} onChange={(e) => setEditing({ ...editing, reasonDetails: e.target.value })} /></Field>
-          <div className="commerce-form-section">{t(T.return_section_customer)}</div>
-          <Field label={t(T.return_field_customer)}><input className="input" value={editing.customerName} onChange={(e) => setEditing({ ...editing, customerName: e.target.value })} /></Field>
-          <Field label={t(T.return_field_email)}><input className="input" type="email" value={editing.customerEmail ?? ""} onChange={(e) => setEditing({ ...editing, customerEmail: e.target.value })} /></Field>
+          <Field label={t(T.return_field_restock)}><select className="input" value={editing.restockPolicy} onChange={(e) => setEditing({ ...editing, restockPolicy: e.target.value as SaveReturn["restockPolicy"] })}><option value="INSPECT">{t(T.return_restock_inspect)}</option><option value="RESTOCK">{t(T.return_restock_stock)}</option><option value="QUARANTINE">{t(T.return_restock_quarantine)}</option><option value="DISPOSE">{t(T.return_restock_dispose)}</option><option value="RETURN_TO_SUPPLIER">{t(T.return_restock_supplier)}</option></select></Field>
           <Field label={t(T.return_field_carrier)}><input className="input" value={editing.returnCarrier ?? ""} onChange={(e) => setEditing({ ...editing, returnCarrier: e.target.value })} /></Field>
           <Field label={t(T.return_field_tracking)}><input className="input" value={editing.trackingNumber ?? ""} onChange={(e) => setEditing({ ...editing, trackingNumber: e.target.value })} /></Field>
-          <Field label={t(T.return_field_restock)}><select className="input" value={editing.restockPolicy} onChange={(e) => setEditing({ ...editing, restockPolicy: e.target.value as SaveReturn["restockPolicy"] })}><option value="INSPECT">{t(T.return_restock_inspect)}</option><option value="RESTOCK">{t(T.return_restock_stock)}</option><option value="QUARANTINE">{t(T.return_restock_quarantine)}</option><option value="DISPOSE">{t(T.return_restock_dispose)}</option><option value="RETURN_TO_SUPPLIER">{t(T.return_restock_supplier)}</option></select></Field>
           <Field label={t(T.return_field_notes)} span={2}><textarea className="input commerce-textarea" value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} /></Field>
-          <div className="commerce-form-section row"><span>{t(T.return_section_items)}</span><button type="button" className="btn btn-secondary" onClick={() => setEditing({ ...editing, items: [...editing.items, blankItem()] })}><Plus size={14} />{t(T.return_add_item)}</button></div>
+          <div className="commerce-form-section row"><span>{t(T.return_section_items)}</span></div>
           <div className="return-items" style={{ gridColumn: "1 / -1" }}>{editing.items.map((item, index) => <div className="return-item-row" key={index}>
             <input className="input" placeholder={t(T.return_item_name)} value={item.name} onChange={(e) => { const items = [...editing.items]; items[index] = { ...item, name: e.target.value }; setEditing({ ...editing, items }); }} />
             <input className="input" placeholder="SKU" value={item.sku ?? ""} onChange={(e) => { const items = [...editing.items]; items[index] = { ...item, sku: e.target.value }; setEditing({ ...editing, items }); }} />

@@ -4,6 +4,8 @@ export type SyncProgressStep = {
   key: string;
   platform: string;
   accountKey?: string;
+  /** Nazwa konta bez platformy — panel postępu pokazuje ją obok logo. */
+  accountName?: string;
   label: string;
   status: SyncStepStatus;
   detail?: string;
@@ -26,8 +28,12 @@ export type SyncProgressState = {
 
 export const ORDER_SYNC_PROGRESS_KEY = "orderSyncProgress";
 export const OFFER_SYNC_PROGRESS_KEY = "offerSyncProgress";
+export const RETURN_SYNC_PROGRESS_KEY = "returnSyncProgress";
 
-const ACTIVE_TTL_MS = 30 * 60 * 1000;
+// Postęp zapisujemy tylko po to, by przeżył przeładowanie okna w trakcie synchronizacji.
+// Stan zakończony NIE wraca po odczycie (od tego jest podsumowanie), a stan „w toku"
+// bez odświeżenia dłużej niż chwilę uznajemy za porzucony (np. zamknięta aplikacja).
+const STALE_MS = 2 * 60 * 1000;
 
 function isProgressState(value: unknown): value is SyncProgressState {
   if (!value || typeof value !== "object") return false;
@@ -48,7 +54,7 @@ export function readSyncProgress(storageKey: string): SyncProgressState | null {
       return null;
     }
     const age = Date.now() - value.updatedAt;
-    if (value.done || age > ACTIVE_TTL_MS) {
+    if (value.done || age > STALE_MS) {
       localStorage.removeItem(storageKey);
       return null;
     }

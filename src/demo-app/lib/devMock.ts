@@ -64,6 +64,21 @@ function makeOrders(): Order[] {
       const derivedStatus = r < 0.72 ? "wyslane" : r < 0.86 ? "do_wyslania" : r < 0.95 ? "nieoplacone" : "anulowane";
       const created = new Date(date.getTime() - Math.floor(rnd() * 86000000));
       const invoiceRequired = id % 7 === 1;
+      const carrier = CARRIERS[Math.floor(rnd() * CARRIERS.length)];
+      // Przesyłki tylko dla wysłanych zamówień — zasilają stronę „Wysyłka".
+      const shipRnd = rnd();
+      const shipStatus = shipRnd < 0.7 ? "DELIVERED" : shipRnd < 0.85 ? "IN_TRANSIT" : shipRnd < 0.94 ? "READY_FOR_PICKUP" : "CREATED";
+      const shipments: Shipment[] = derivedStatus === "wyslane" ? [{
+        id: `shp-${id}`,
+        provider: m.mkt === "erli" ? "erli" : m.mkt === "allegro" ? "allegro_order_tracking" : "inpost_shipx",
+        marketplace: m.mkt,
+        trackingNumber: rnd() < 0.05 ? undefined : `${carrier.slice(0, 2).toUpperCase()}${String(600000000000 + id * 7919)}`,
+        carrier,
+        service: "Standard",
+        labelPath: rnd() < 0.6 ? `C:/labels/${id}.pdf` : undefined,
+        status: shipStatus,
+        createdAt: new Date(created.getTime() + 3600000 * 6).toISOString(),
+      }] : [];
       orders.push({
         id: id++,
         accountName: m.account,
@@ -72,8 +87,8 @@ function makeOrders(): Order[] {
         totalToPay: total.toFixed(2),
         currency: curr,
         derivedStatus,
-        carrier: CARRIERS[Math.floor(rnd() * CARRIERS.length)],
-        shipments: [],
+        carrier,
+        shipments,
         orderCreatedAt: created.toISOString(),
         buyerLogin: `klient_${id}`,
         buyerEmail: `klient_${id}@example.pl`,
@@ -101,6 +116,9 @@ function makeOrders(): Order[] {
 const isoAt = (daysFromToday: number) => new Date(Date.now() + daysFromToday * 86400000).toISOString();
 const dateAt = (daysFromToday: number) => isoAt(daysFromToday).slice(0, 10);
 
+// ─── DEMO: wzbogacenie danych pod publiczny podgląd na paczkowo.net ──────────
+// Zamówienia z `makeOrders()` są celowo ubogie (dev). W demo pokazujemy pełne
+// karty: dane kupującego, adres dostawy, płatność i realistyczne przesyłki.
 const DEMO_BUYERS = [
   ["Anna", "Kowalska", "Kraków", "30-001"],
   ["Marek", "Nowak", "Gdańsk", "80-001"],
@@ -173,7 +191,7 @@ function decorateDemoOrders(orders: Order[]): Order[] {
     };
 
     if (order.derivedStatus === "nieoplacone" || order.derivedStatus === "anulowane" || index % 6 === 5) {
-      return enriched;
+      return { ...enriched, shipments: [] };
     }
 
     const status = order.derivedStatus === "do_wyslania" ? "CREATED" : DEMO_SHIPMENT_STATUSES[index % DEMO_SHIPMENT_STATUSES.length];
@@ -398,6 +416,8 @@ function makeReturns(): ReturnCase[] {
   return [
     { ...common, id: 1, sourcePlatform: "allegro", accountName: "moj_sklep_pl", externalReturnId: "return-10482", externalStatus: "IN_TRANSIT", paymentId: "payment-10482", externalOrderId: "AL-10482", customerName: "Marek Nowak", customerEmail: "marek@example.pl", returnType: "WITHDRAWAL", status: "REQUESTED", resolution: "REFUND", reasonCode: "CHANGED_MIND", requestedAt: dateAt(-2), refundDueAt: dateAt(12), refundAmount: 89, restockPolicy: "INSPECT", notes: "", updatedAt: isoAt(-2), items: [{ id: 1, sku: "LAD-GAN65", imageUrl: PRODUCTS[3].img, name: "Ładowarka GaN 65W USB-C", quantity: 1, itemCondition: "UNKNOWN", resolution: "REFUND" }] },
     { ...common, id: 2, sourcePlatform: "allegro", accountName: "moj_sklep_pl", externalReturnId: "return-71811", externalStatus: "DELIVERED", paymentId: "payment-71811", externalOrderId: "AMZ-71811", customerName: "Joanna Lis", customerEmail: "joanna@example.pl", returnType: "MARKETPLACE_RETURN", status: "ACCEPTED", resolution: "REFUND", reasonCode: "NOT_AS_DESCRIBED", reasonDetails: "Kolor inny niż na zdjęciu.", requestedAt: dateAt(-10), refundDueAt: dateAt(4), receivedAt: isoAt(-1), refundAmount: 59.9, returnCarrier: "InPost", trackingNumber: "123456789012345678901234", restockPolicy: "INSPECT", updatedAt: isoAt(-1), items: [{ id: 2, sku: "UCH-MAGSAFE", imageUrl: PRODUCTS[4].img, name: "Uchwyt samochodowy MagSafe", quantity: 1, itemCondition: "OPENED", resolution: "REFUND" }] },
+    // Zwrot z pobrania: brak płatności do cofnięcia, Allegro podaje konto kupującego.
+    { ...common, id: 5, sourcePlatform: "allegro", accountName: "outlet_gsm", externalReturnId: "return-88112", externalStatus: "DELIVERED", externalOrderId: "AL-88112", customerName: "Anna Dąbrowska", customerEmail: "anna@example.pl", returnType: "MARKETPLACE_RETURN", status: "ACCEPTED", resolution: "REFUND", reasonCode: "TOO_SMALL", requestedAt: dateAt(-5), refundDueAt: dateAt(9), receivedAt: isoAt(-1), refundAmount: 149.9, restockPolicy: "INSPECT", updatedAt: isoAt(-1), refundBankAccount: { owner: "Anna Dąbrowska", accountNumber: "40114000003382916456018050", iban: "PL40114000003382916456018050", swift: "ALBPPLPW", address: "Jasna 1, 24-200 Warszawa, PL" }, items: [{ id: 5, sku: "SZK-S24", imageUrl: PRODUCTS[2].img, name: "Szkło hartowane Galaxy S24", quantity: 2, itemCondition: "NEW", resolution: "REFUND" }] },
     { ...common, id: 3, externalOrderId: "WEB-19832", customerName: "Piotr Zieliński", customerEmail: "piotr@example.pl", returnType: "COMPLAINT", status: "ACCEPTED", resolution: "REPLACEMENT", reasonCode: "DAMAGED", requestedAt: dateAt(-18), receivedAt: isoAt(-12), refundStatus: "NOT_REQUIRED", refundAmount: 0, restockPolicy: "QUARANTINE", updatedAt: isoAt(-3), items: [{ id: 3, sku: "PB-20K", imageUrl: PRODUCTS[5].img, name: "Powerbank 20000 mAh PD", quantity: 1, itemCondition: "DAMAGED", resolution: "REPLACEMENT" }] },
     { ...common, id: 4, externalOrderId: "AL-9920", customerName: "Katarzyna Wójcik", returnType: "WITHDRAWAL", status: "REFUNDED", resolution: "REFUND", reasonCode: "CHANGED_MIND", requestedAt: dateAt(-16), refundDueAt: dateAt(-2), receivedAt: isoAt(-11), refundedAt: isoAt(-8), refundStatus: "COMPLETED", refundAmount: 24.5, restockPolicy: "RESTOCK", updatedAt: isoAt(-8), items: [{ id: 4, sku: "KAB-USBC-2M", imageUrl: PRODUCTS[1].img, name: "Kabel USB-C 2 m 100W", quantity: 1, itemCondition: "NEW", resolution: "REFUND" }] },
   ];
@@ -429,6 +449,7 @@ function mockInvoiceDraft(): SaveInvoice {
 
 /** Podmienia most Tauri na kanned odpowiedzi. Wołaj PRZED renderem aplikacji. */
 export function installDevMock() {
+  // DEMO: strona jest SPA — `client:only` może zamontować komponent ponownie.
   if ((window as unknown as Record<string, boolean>).__PACZKOWO_DEMO_MOCK__) return;
   (window as unknown as Record<string, boolean>).__PACZKOWO_DEMO_MOCK__ = true;
 
@@ -605,6 +626,7 @@ export function installDevMock() {
   };
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
     invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      // ── DEMO: komendy obsługiwane w przeglądarce (brak warstwy Rust) ──
       if (cmd === "open_url" || cmd === "open_file" || cmd === "print_label") return null;
       if (cmd === "get_orders") return { orders: structuredClone(orders) };
       if (cmd === "get_shipments_info") {
@@ -773,16 +795,32 @@ export function installDevMock() {
       if (cmd === "list_offers") {
         const query = (args?.query ?? {}) as { page?: number; pageSize?: number; search?: string; status?: string | null; platforms?: string[]; accounts?: string[] };
         const search = String(query.search ?? "").trim().toLowerCase();
-        const filtered = offers.filter((offer) => (!search || `${offer.title} ${offer.sku} ${offer.ean ?? ""} ${offer.brand ?? ""}`.toLowerCase().includes(search))
-          && (!query.status || offer.status === query.status)
-          && (!query.platforms?.length || query.platforms.includes(offer.sourcePlatform))
-          && (!query.accounts?.length || query.accounts.includes(offer.accountName ?? "")));
+        // Fasety liczone jak w bazie: każdy wymiar pomija własny filtr.
+        const matchSearch = (offer: Offer) => !search || `${offer.title} ${offer.sku} ${offer.ean ?? ""} ${offer.brand ?? ""}`.toLowerCase().includes(search);
+        const matchStatus = (offer: Offer) => !query.status || offer.status === query.status;
+        const matchPlatform = (offer: Offer) => !query.platforms?.length || query.platforms.includes(offer.sourcePlatform);
+        const matchAccount = (offer: Offer) => !query.accounts?.length || query.accounts.includes(offer.accountName ?? "");
+        const scope = (skip: "status" | "platforms" | "accounts" | "none") => offers.filter((offer) => matchSearch(offer)
+          && (skip === "status" || matchStatus(offer))
+          && (skip === "platforms" || matchPlatform(offer))
+          && (skip === "accounts" || matchAccount(offer)));
+        const filtered = scope("none");
         const pageSize = query.pageSize === 50 || query.pageSize === 100 ? query.pageSize : 20;
         const page = Math.max(1, Number(query.page ?? 1));
-        const statusCounts = Object.fromEntries(offers.map((offer) => offer.status).map((status) => [status, offers.filter((offer) => offer.status === status).length]));
-        const facets = (key: (offer: Offer) => string) => Object.entries(offers.reduce<Record<string, number>>((map, offer) => { const value = key(offer); map[value] = (map[value] ?? 0) + 1; return map; }, {})).map(([key, count]) => ({ key, count }));
-        const values = Object.entries(offers.filter((offer) => offer.status === "ACTIVE").reduce<Record<string, number>>((map, offer) => { map[offer.currency] = (map[offer.currency] ?? 0) + offer.priceAmount * offer.availableQuantity; return map; }, {})).map(([currency, amount]) => ({ currency, amount }));
-        return { offers: structuredClone(filtered.slice((page - 1) * pageSize, page * pageSize)), total: filtered.length, page, pageSize, platformFacets: facets((offer) => offer.sourcePlatform), accountFacets: facets((offer) => offer.accountName ?? ""), statusCounts, activeStockValues: values };
+        const withoutStatus = scope("status");
+        const statusCounts = Object.fromEntries(withoutStatus.map((offer) => offer.status).map((status) => [status, withoutStatus.filter((offer) => offer.status === status).length]));
+        const facets = (source: Offer[], key: (offer: Offer) => string) => Object.entries(source.reduce<Record<string, number>>((map, offer) => { const value = key(offer); map[value] = (map[value] ?? 0) + 1; return map; }, {})).map(([key, count]) => ({ key, count }));
+        // Konta niosą też platformy — tak samo jak zapytanie GROUP_CONCAT w bazie.
+        // Lista kont jest pełna (wszystkie oferty), a liczniki zawężone filtrem.
+        const withoutAccounts = scope("accounts");
+        const scopedAccountCounts = new Map(facets(withoutAccounts, (offer) => offer.accountName ?? "").map((facet) => [facet.key, facet.count]));
+        const accountFacets = facets(offers, (offer) => offer.accountName ?? "").map((facet) => ({
+          ...facet,
+          count: scopedAccountCounts.get(facet.key) ?? 0,
+          platforms: [...new Set(offers.filter((offer) => (offer.accountName ?? "") === facet.key).map((offer) => offer.sourcePlatform))],
+        }));
+        const values = Object.entries(withoutStatus.filter((offer) => offer.status === "ACTIVE").reduce<Record<string, number>>((map, offer) => { map[offer.currency] = (map[offer.currency] ?? 0) + offer.priceAmount * offer.availableQuantity; return map; }, {})).map(([currency, amount]) => ({ currency, amount }));
+        return { offers: structuredClone(filtered.slice((page - 1) * pageSize, page * pageSize)), total: filtered.length, page, pageSize, platformFacets: facets(scope("platforms"), (offer) => offer.sourcePlatform), accountFacets, statusCounts, activeStockValues: values };
       }
       if (cmd === "save_offer") {
         const input = args?.input as SaveOffer;
@@ -1212,6 +1250,29 @@ export function installDevMock() {
         return null;
       }
       if (cmd === "sync_marketplace_returns") return { accountsSynced: 1, fetched: returns.length, saved: returns.length, pendingRefunds: returns.filter((item) => item.refundStatus === "PENDING").length };
+      if (cmd === "sync_marketplace_return_platform") {
+        const platform = String(args?.platform ?? "");
+        const scoped = returns.filter((item) => item.sourcePlatform === platform);
+        return { accountsSynced: 1, fetched: scoped.length, saved: scoped.length, pendingRefunds: scoped.filter((item) => item.refundStatus === "PENDING").length };
+      }
+      if (cmd === "claim_return_commission") {
+        const claim = `claim-${args?.id}`;
+        returns = returns.map((item) => item.id === args?.id ? { ...item, commissionClaimIds: claim, commissionClaimStatus: "IN_PROGRESS" } : item);
+        return claim;
+      }
+      if (cmd === "refresh_return_commission") {
+        returns = returns.map((item) => item.id === args?.id ? { ...item, commissionClaimStatus: "GRANTED" } : item);
+        return "GRANTED";
+      }
+      if (cmd === "create_return_label") {
+        const request = args?.request as { returnId: number };
+        const tracking = `62099967${String(request.returnId).padStart(3, "0")}RET`;
+        const labelPath = `C:/etykiety/zwrot_${request.returnId}.pdf`;
+        returns = returns.map((item) => item.id === request.returnId
+          ? { ...item, returnLabelPath: labelPath, returnLabelTracking: tracking, returnLabelCarrier: "inpost" }
+          : item);
+        return { trackingNumber: tracking, labelPath, carrier: "inpost" };
+      }
       if (cmd === "execute_return_refund") { returns = returns.map((item) => item.id === args?.id ? { ...item, refundStatus: "PENDING", refundId: `refund-${item.id}` } : item); return `refund-${args?.id}`; }
       if (cmd === "reject_marketplace_return") { const input = args?.input as { id: number }; returns = returns.map((item) => item.id === input.id ? { ...item, status: "REJECTED", refundStatus: "NOT_REQUIRED" } : item); return null; }
 

@@ -1,6 +1,6 @@
 // Klient serwera licencji/kont — wrappery na komendy Rust (server::account).
 // Cała komunikacja idzie przez Rust (omija CORS, tokeny w app_settings).
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./serverStatus";
 
 export type LicenseStatus = "TRIAL" | "PREMIUM" | "EXPIRED";
 export type License = {
@@ -67,6 +67,14 @@ export function purgeAccountStock(integrationId: string) {
 
 export function getCurrentUser() {
   return invoke<{ email: string; userId: string }>("get_current_user");
+}
+
+export function getRecentLoginEmails() {
+  return invoke<string[]>("get_recent_login_emails");
+}
+
+export function rememberLoginEmail(email: string) {
+  return invoke<void>("remember_login_email", { email });
 }
 
 export function changePassword(oldPassword: string, newPassword: string) {

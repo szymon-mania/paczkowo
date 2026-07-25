@@ -1,7 +1,7 @@
 // Kursy walut do przeliczania kwot na dashboardzie (źródło: NBP, komenda `get_fx_rates`).
 // `rates[x]` = ile PLN za 1 jednostkę waluty x (baza PLN, rates["PLN"] = 1).
 // Przelicznik: value_from → value_to = value * rates[from] / rates[to].
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./serverStatus";
 
 export type FxRates = { base: string; date: string; rates: Record<string, number> };
 

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, onServerSignal, classifyServerError } from "./lib/serverStatus";
 import type { Order, Account, OrderItem, DerivedStatus } from "./lib/types";
 import { carrierLabel } from "./lib/carriers";
 import ShipmentForm from "./components/ShipmentForm";
@@ -19,13 +18,26 @@ import { getInvoiceForOrder, invoiceDraftFromOrder, issueInvoice, saveInvoice, t
 import { downloadInvoicePdf, printInvoicePdf } from "./lib/invoicePdf";
 import AccountSettings from "./components/AccountSettings";
 import ProductThumbs, { ItemThumb } from "./components/ProductThumbs";
-import { Settings as SettingsIcon, Pencil, LogOut, ChevronLeft, ChevronDown, Check, RefreshCw, Printer, FileText, Eye, Download, LifeBuoy, AlertTriangle } from "lucide-react";
+import { Settings as SettingsIcon, Pencil, LogOut, ChevronLeft, Check, RefreshCw, Printer, FileText, Eye, Download, LifeBuoy, AlertTriangle } from "lucide-react";
 import { CommerceModal, CommercePagination } from "./components/CommerceUi";
+import {
+  buildChannelOptions,
+  channelAccountKey,
+  channelAccountLabel,
+  channelLabel,
+  ChannelFilterSelect,
+  COURIER_CATALOG,
+  CourierFilterPanel,
+  matchCourierDef,
+  PlatformLogo,
+  PortalPopover,
+} from "./components/ListFilters";
 import { AuthScreen, UpgradeScreen, VerificationScreen, ServerDownScreen } from "./pages/Account";
 import { serverIsLoggedIn, serverLicense, serverLogout, serverCheckout, setCurrentUser, getCurrentUser, getIntegrations, refreshIntegrations, verificationStatus, checkUpdate, submitSupportRequest, type License, type Integration, type UpdateManifest } from "./lib/accountApi";
 import { installUpdateOrOpen } from "./lib/updater";
 import { messageKey, translateMessage, useI18n, T, localeOf, type TFn } from "./lib/i18n";
-import { clearSyncProgress, OFFER_SYNC_PROGRESS_KEY, ORDER_SYNC_PROGRESS_KEY, readSyncProgress, syncProgressPercent, writeSyncProgress, type SyncProgressState, type SyncProgressStep, type SyncStepStatus } from "./lib/syncProgress";
+import { clearSyncProgress, OFFER_SYNC_PROGRESS_KEY, ORDER_SYNC_PROGRESS_KEY, readSyncProgress, writeSyncProgress, type SyncProgressState, type SyncProgressStep, type SyncStepStatus } from "./lib/syncProgress";
+import { SyncProgressPanel, SyncSummaryBanner, type SyncSummary } from "./components/SyncStatus";
 
 // ─── KONFIGURACJA SEGMENTÓW / KURIERÓW ───────────────────────────────────────
 
@@ -67,56 +79,13 @@ const ALLEGRO_WZA_PROVIDER = "allegro_wza";
 const allegroShipmentIds = (order: Order) =>
   order.shipments.filter((shipment) => shipment.provider === ALLEGRO_WZA_PROVIDER).map((shipment) => shipment.id);
 
-// ─── ETYKIETY KANAŁÓW / SORTOWANIE ───────────────────────────────────────────
-const CHANNEL_LABEL: Record<string, string> = {
-  allegro: "Allegro", erli: "Erli", amazon: "Amazon", ebay: "eBay", inpost_merchant: "InPost Merchant",
-};
-const CHANNEL_KEY: Record<string, T> = { woocommerce: T.channel_own_store, shopify: T.channel_own_store };
-function channelLabel(mkt: string | undefined, t: TFn) {
-  if (!mkt) return "—";
-  const k = mkt.toLowerCase();
-  if (CHANNEL_KEY[k]) return t(CHANNEL_KEY[k]);
-  return CHANNEL_LABEL[k] ?? mkt.charAt(0).toUpperCase() + mkt.slice(1);
-}
-type ChannelOption = {
-  value: string;
-  platform: string;
-  platformLabel: string;
-  accountName: string;
-  accountDisplayName: string;
-  count: number;
-};
-function channelAccountKey(order: Order) {
-  return `${(order.marketplace ?? "").toLowerCase()}::${order.accountName ?? ""}`;
-}
-function channelAccountLabel(order: Order) {
-  return order.accountDisplayName || order.accountName || "Konto";
-}
 function orderTime(o: Order): number {
   return o.orderCreatedAt ? Date.parse(o.orderCreatedAt) : 0;
 }
 
-// ─── FILTRY PRZEWOŹNIKÓW (ogólne + szczegółowe) ───────────────────────────────
-const NORMC = (s?: string) => (s ?? "").toUpperCase().replace(/[\s_-]/g, "");
-type CourierDef = { id: string; label: string; carrier: string; method?: string };
-const COURIER_CATALOG: CourierDef[] = [
-  { id: "inpost", label: "InPost", carrier: "inpost" },
-  { id: "inpost-paczkomat", label: "InPost Paczkomaty", carrier: "inpost", method: "paczkomat" },
-  { id: "inpost-kurier", label: "InPost Kurier", carrier: "inpost", method: "kurier" },
-  { id: "dpd", label: "DPD", carrier: "dpd" },
-  { id: "dpd-kurier", label: "DPD Kurier", carrier: "dpd", method: "kurier" },
-  { id: "dhl", label: "DHL", carrier: "dhl" },
-  { id: "dhl-kurier", label: "DHL Kurier", carrier: "dhl", method: "kurier" },
-  { id: "ups", label: "UPS", carrier: "ups" },
-  { id: "orlen", label: "Orlen Paczka", carrier: "orlen" },
-  { id: "poczta", label: "Poczta Polska", carrier: "poczta" },
-];
-const DEFAULT_COURIER_IDS = ["inpost", "dpd", "dhl", "ups", "orlen"];
-function matchCourierDef(o: Order, def: CourierDef): boolean {
-  if (NORMC(o.carrier) !== NORMC(def.carrier)) return false;
-  if (def.method) return (o.deliveryMethodName ?? "").toLowerCase().includes(def.method);
-  return true;
-}
+const ORDER_FILTER_STATUS_KEY = "orderStatusFilter";
+const ORDER_FILTER_CHANNEL_KEY = "orderChannelFilter";
+const ORDER_FILTER_COURIER_KEY = "orderCourierFilter";
 
 // ─── KOLUMNA „OZNACZENIA": ikony statusu (konfigurowalne) ──────────────────────
 type IconKey = "paid" | "shipment" | "invoice";
@@ -286,93 +255,6 @@ function OrderRow({ order, onOpen, cols }: { order: Order; onOpen: (o: Order) =>
         <button type="button" className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); open(); }}>{t(T.common_details)}</button>
       </td>
     </tr>
-  );
-}
-
-// ── Wyzwalacz filtra przewoźnika: lista z licznikami + edytor filtrów ──
-function CourierFilterSelect({ value, onChange, activeIds, setActiveIds, counts }: {
-  value: string; onChange: (id: string) => void;
-  activeIds: string[]; setActiveIds: (ids: string[]) => void;
-  counts: Record<string, number>;
-}) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState(false);
-  const [q, setQ] = useState("");
-  const activeDefs = COURIER_CATALOG.filter((d) => activeIds.includes(d.id));
-  const current = value === "all" ? t(T.ord_courier_all) : (COURIER_CATALOG.find((d) => d.id === value)?.label ?? t(T.ord_courier_all));
-  const catalog = COURIER_CATALOG.filter((d) => d.label.toLowerCase().includes(q.trim().toLowerCase()));
-  const close = () => { setOpen(false); setEdit(false); setQ(""); };
-  const toggle = (id: string) => setActiveIds(activeIds.includes(id) ? activeIds.filter((x) => x !== id) : [...activeIds, id]);
-
-  return (
-    <div style={{ position: "relative", width: 180 }}>
-      <button type="button" className="ord-select-btn" onClick={() => setOpen((o) => !o)}>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{current}</span>
-        <ChevronDown size={15} style={{ opacity: 0.6, flex: "none" }} />
-      </button>
-      {open && (
-        <>
-          <div className="ord-acct-overlay" onClick={close} />
-          <div className="ord-pop" style={{ top: "100%", right: 0, marginTop: 6 }}>
-            {!edit ? (
-              <>
-                <button type="button" className="ord-pop-item" aria-selected={value === "all"} onClick={() => { onChange("all"); close(); }}>
-                  {t(T.ord_courier_all)} <span className="ord-pop-count">{counts.all ?? 0}</span>
-                </button>
-                {activeDefs.map((d) => (
-                  <button key={d.id} type="button" className="ord-pop-item" aria-selected={value === d.id} onClick={() => { onChange(d.id); close(); }}>
-                    {d.label} <span className="ord-pop-count">{counts[d.id] ?? 0}</span>
-                  </button>
-                ))}
-                <div className="ord-pop-divider" />
-                <button type="button" className="ord-pop-item" style={{ color: "var(--accent)", fontWeight: 500 }} onClick={() => setEdit(true)}>
-                  <Pencil size={13} /> {t(T.ord_courier_more)}
-                </button>
-              </>
-            ) : (
-              <>
-                <div style={{ padding: "2px 4px 8px" }}>
-                  <input className="input" autoFocus placeholder={t(T.ord_courier_search_ph)} value={q} onChange={(e) => setQ(e.target.value)} />
-                </div>
-                <div style={{ maxHeight: 240, overflowY: "auto" }}>
-                  {catalog.map((d) => {
-                    const on = activeIds.includes(d.id);
-                    return (
-                      <button key={d.id} type="button" className="ord-pop-item" onClick={() => toggle(d.id)}>
-                        <span className={"ord-check" + (on ? " on" : "")}>{on && <Check size={11} strokeWidth={3} />}</span>
-                        {d.label}
-                      </button>
-                    );
-                  })}
-                  {catalog.length === 0 && <div className="text-muted" style={{ padding: "8px 9px", fontSize: 12 }}>{t(T.ord_no_results)}</div>}
-                </div>
-                <div className="ord-pop-divider" />
-                <button type="button" className="ord-pop-item" style={{ color: "var(--accent)", fontWeight: 500 }} onClick={() => { setEdit(false); setQ(""); }}>
-                  <ChevronLeft size={13} /> {t(T.ord_done)}
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Popover renderowany w portalu (position: fixed) — nie jest obcinany przez
-// przewijanie tabeli (overflow-x na karcie). Pozycja liczona z kotwicy.
-function PortalPopover({ anchor, onClose, align = "left", children }: { anchor: HTMLElement | null; onClose?: () => void; align?: "left" | "right"; children: React.ReactNode }) {
-  if (!anchor) return null;
-  const r = anchor.getBoundingClientRect();
-  const style: React.CSSProperties = { position: "fixed", top: r.bottom + 6, zIndex: 60 };
-  if (align === "right") style.right = window.innerWidth - r.right; else style.left = r.left;
-  return createPortal(
-    <>
-      {onClose && <div className="ord-acct-overlay" style={{ zIndex: 59 }} onClick={onClose} />}
-      <div className="ord-pop" style={style}>{children}</div>
-    </>,
-    document.body
   );
 }
 
@@ -1135,11 +1017,6 @@ type OrderSyncResult = {
   failedPlatforms?: string[];
 };
 
-function syncStatusLabel(status: SyncStepStatus, lang: string) {
-  if (lang === "pl") return status === "active" ? "W toku" : status === "done" ? "Gotowe" : status === "error" ? "Błąd" : "Czeka";
-  return status === "active" ? "In progress" : status === "done" ? "Done" : status === "error" ? "Error" : "Waiting";
-}
-
 function syncStepDetail(saved: number, fetched: number, lang: string) {
   return lang === "pl" ? `${saved} zapis. / ${fetched} pobr.` : `${saved} saved / ${fetched} fetched`;
 }
@@ -1155,6 +1032,7 @@ function orderSyncStepsFromIntegrations(items: Integration[], t: TFn): SyncProgr
         key: `${item.platform}::${accountKey || item.id}`,
         platform: item.platform,
         accountKey,
+        accountName: item.accountName,
         label: `${item.accountName} · ${channelLabel(item.platform, t)}`,
         status,
         detail: blocked
@@ -1164,120 +1042,22 @@ function orderSyncStepsFromIntegrations(items: Integration[], t: TFn): SyncProgr
     });
 }
 
-function SyncProgress({ progress }: { progress: SyncProgressState }) {
-  const { t, lang } = useI18n();
-  const active = progress.steps.find((item) => item.status === "active");
-  const finished = progress.steps.filter((item) => item.status === "done" || item.status === "error").length;
-  const numbers = [
-    `${finished} / ${progress.steps.length}`,
-    lang === "pl" ? `pobrano ${progress.fetched}` : `fetched ${progress.fetched}`,
-    lang === "pl" ? `zapisano ${progress.saved}` : `saved ${progress.saved}`,
-  ];
-  if (progress.conflicts) numbers.push(lang === "pl" ? `konflikty ${progress.conflicts}` : `conflicts ${progress.conflicts}`);
-  const context = active
-    ? `${lang === "pl" ? "Teraz" : "Now"}: ${active.label}`
-    : progress.done
-      ? (lang === "pl" ? "Zakończono" : "Done")
-      : progress.title;
-  const subtitle = `${context} · ${numbers.join(" · ")}`;
-  return <div className="commerce-sync-progress ord-sync-progress" role="status" aria-live="polite">
-    <div><strong>{t(T.ord_sync)}</strong><span>{subtitle}</span></div>
-    <div className="commerce-sync-progress-track"><span style={{ width: `${syncProgressPercent(progress)}%` }} /></div>
-    <div className="commerce-sync-platforms">
-      {progress.steps.map((item) => {
-        const status = syncStatusLabel(item.status, lang);
-        const metric = item.status === "done" || item.status === "error" ? item.detail : undefined;
-        return (
-          <span className={`commerce-sync-platform ${item.status}`} key={item.key} title={item.detail}>
-            <span className="commerce-sync-dot" />
-            <strong>{item.label}</strong>
-            <small>{metric ? `${status} · ${metric}` : status}</small>
-          </span>
-        );
-      })}
-    </div>
-  </div>;
-}
-
-function PlatformLogo({ platform, fallback, size = 26 }: { platform: string; fallback?: string; size?: number }) {
-  const key = (platform || "").toLowerCase().replace(/-/g, "_");
-  const sources = key === "inpost_merchant"
-    ? ["/logos/inpost-merchant.svg", "/logos/inpost-merchant.png", "/logos/inpost_merchant.svg", "/logos/inpost_merchant.png", "/logos/inpost.svg", "/logos/inpost.png"]
-    : [`/logos/${key}.svg`, `/logos/${key}.png`];
-  const [step, setStep] = useState(0);
-  if (!key || step >= sources.length) {
-    const letter = (fallback ?? platform ?? "?").trim().charAt(0).toUpperCase() || "?";
-    return (
-      <span style={{ width: size, height: size, borderRadius: "var(--radius-sm)", background: "var(--color-accent-800)", color: "var(--color-accent-100)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: size * 0.5 }}>
-        {letter}
-      </span>
-    );
-  }
-  const src = sources[step];
-  return <img key={src} src={src} alt={platform} width={size} height={size} style={{ objectFit: "contain", display: "block" }} onError={() => setStep((s) => s + 1)} />;
-}
-
-function ChannelFilterSelect({ value, options, onChange }: { value: string; options: ChannelOption[]; onChange: (value: string) => void }) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const selected = options.find((option) => option.value === value) ?? null;
-
-  const choose = (next: string) => {
-    onChange(next);
-    setOpen(false);
-  };
-
-  return (
-    <div className="order-channel-filter">
-      <button
-        ref={buttonRef}
-        type="button"
-        id="ord-channel"
-        className="order-channel-filter-button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {selected ? (
-          <span className="order-channel-filter-label">
-            <PlatformLogo platform={selected.platform} fallback={selected.platformLabel} size={20} />
-            <span className="order-channel-copy">
-              <strong>{selected.platformLabel}</strong>
-              <small>{selected.accountDisplayName || selected.accountName || "Konto"}</small>
-            </span>
-          </span>
-        ) : (
-          <span>{t(T.common_all)}</span>
-        )}
-        <ChevronDown size={15} />
-      </button>
-      {open && (
-        <PortalPopover anchor={buttonRef.current} onClose={() => setOpen(false)}>
-          <div className="order-channel-menu" role="listbox" aria-labelledby="ord-channel">
-            <button type="button" className="ord-pop-item order-channel-option" aria-selected={value === "all"} onClick={() => choose("all")}>
-              <span className={"ord-check" + (value === "all" ? " on" : "")}>{value === "all" && <Check size={11} strokeWidth={3} />}</span>
-              <span>{t(T.common_all)}</span>
-            </button>
-            {options.map((option) => (
-              <button key={option.value} type="button" className="ord-pop-item order-channel-option" aria-selected={value === option.value} onClick={() => choose(option.value)}>
-                <span className={"ord-check" + (value === option.value ? " on" : "")}>{value === option.value && <Check size={11} strokeWidth={3} />}</span>
-                <PlatformLogo platform={option.platform} fallback={option.platformLabel} size={22} />
-                <span className="order-channel-copy">
-                  <strong>{option.platformLabel}</strong>
-                  <small>{option.accountDisplayName || option.accountName || "Konto"}</small>
-                </span>
-                <span className="ord-pop-count">{option.count}</span>
-              </button>
-            ))}
-          </div>
-        </PortalPopover>
-      )}
-    </div>
-  );
-}
 
 type View = "orders" | "shipments" | "offers" | "invoices" | "returns" | "magazyn" | "kurier" | "stats" | "integracje" | "ustawienia";
+
+// Stan licencji zmienia się najwyżej raz na dobę (`validUntil`, podpis ważny 1 dzień),
+// a egzekwuje go i tak serwer przy wydawaniu tokenów — odpytywanie co kilka sekund nic
+// nie dawało, za to zjadało limit 10 000 żądań/h na IP (kilka stanowisk w jednej firmie).
+// Realną reakcję zapewniają zdarzenia: powrót do okna, powrót sieci i błąd z dowolnej
+// komendy (`onServerSignal`), a nie częsty timer.
+const ACCOUNT_HEALTH_CHECK_MS = 15 * 60_000;
+const ACCOUNT_HEALTH_FOCUS_GAP_MS = 60_000; // alt-tab nie ma generować ruchu
+const ACCOUNT_HEALTH_RETRY_MS = 5_000; // dogrywka po pierwszej nieudanej próbie
+const SERVER_DOWN_STRIKES = 2; // ekran awarii dopiero po 2 porażkach z rzędu
+
+function isServerUnavailableError(error: unknown) {
+  return classifyServerError(error) === "unavailable";
+}
 
 export default function App() {
   const { t, lang } = useI18n();
@@ -1291,6 +1071,7 @@ export default function App() {
 
   async function loadAccount() {
     setServerUnavailable(false); // każda próba zaczyna od czystego stanu offline
+    serverStrikes.current = 0;
     try {
       const logged = await serverIsLoggedIn();
       setLoggedIn(logged);
@@ -1317,14 +1098,14 @@ export default function App() {
         // Rozróżnij: serwer nieosiągalny (offline/5xx) vs realne wygaśnięcie sesji.
         // Warstwa Rust przy braku sieci zwraca „Brak połączenia…/serwer chwilowo
         // niedostępny" i NIE czyści sesji — wtedy pokazujemy ekran „usługi niedostępne".
-        // Backend zwraca klucz słownika (np. "err_server_unavailable") — regex to fallback.
-        const key = messageKey(e);
-        const offline = key === T.err_server_unavailable || key === T.err_server_generic
-          || /Brak połączenia|niedostępn|chwilowo/i.test(String((e as { message?: string })?.message ?? e));
+        // Klasyfikacja jest wspólna dla całej aplikacji (`lib/serverStatus`).
+        const offline = isServerUnavailableError(e);
         const still = await serverIsLoggedIn();
         setLoggedIn(still);
         setLicense(null);
         if (offline && still) {
+          // Start aplikacji: nie ma czego stracić, więc ekran awarii pokazujemy od razu.
+          serverStrikes.current = SERVER_DOWN_STRIKES;
           setServerUnavailable(true); // zalogowany lokalnie, ale serwer nie odpowiada
         } else if (!still) {
           setSessionExpired(true); // dopiero realne wygaśnięcie → komunikat
@@ -1344,9 +1125,123 @@ export default function App() {
     /* eslint-disable-next-line */
   }, []);
 
+  // Licznik nieudanych prób kontaktu z serwerem dla SOND W TLE (timer/powrót do okna).
+  // Ekran awarii przejmuje cały widok, więc pojedyncze mrugnięcie sieci nie może wyrzucić
+  // usera ze środka pracy — wymagamy potwierdzenia drugą próbą (SERVER_DOWN_STRIKES).
+  // Błąd z realnej komendy (`onServerSignal`) jest już dowodem i idzie na ekran od razu.
+  const serverStrikes = useRef(0);
+  const healthTickRef = useRef<(() => void) | null>(null);
+
+  async function checkAccountHealth() {
+    const still = await serverIsLoggedIn();
+    setLoggedIn(still);
+    if (!still) {
+      setLicense(null);
+      setServerUnavailable(false);
+      return;
+    }
+
+    try {
+      const lic = await serverLicense();
+      setLicense(lic);
+      serverStrikes.current = 0;
+      setServerUnavailable(false);
+      setSessionExpired(false);
+      if (lic.status === "EXPIRED") {
+        try {
+          const vs = await verificationStatus();
+          setNeedsVerification(!(vs.active || vs.licenseActive) && (!vs.emailVerified || !vs.phoneVerified));
+        } catch {
+          setNeedsVerification(false);
+        }
+      } else {
+        setNeedsVerification(false);
+      }
+      if (lic.userId) await setCurrentUser(lic.userId).catch(() => {});
+    } catch (e) {
+      const stillAfterError = await serverIsLoggedIn();
+      setLoggedIn(stillAfterError);
+      if (isServerUnavailableError(e) && stillAfterError) {
+        serverStrikes.current += 1;
+        if (serverStrikes.current >= SERVER_DOWN_STRIKES) {
+          setServerUnavailable(true);
+        } else {
+          // Pierwsza porażka: nie ruszamy ekranu, tylko dogrywamy próbę za chwilę.
+          window.setTimeout(() => healthTickRef.current?.(), ACCOUNT_HEALTH_RETRY_MS);
+        }
+        return;
+      }
+      if (!stillAfterError || messageKey(e) === T.err_server_unauthorized) {
+        setLicense(null);
+        serverStrikes.current = 0;
+        setServerUnavailable(false);
+        setSessionExpired(true);
+      }
+    }
+  }
+
+  const healthCheckInFlight = useRef(false);
+  const loggedInRef = useRef(false);
+  useEffect(() => { loggedInRef.current = loggedIn; });
+
+  useEffect(() => {
+    const tick = async () => {
+      if (healthCheckInFlight.current) return;
+      healthCheckInFlight.current = true;
+      try {
+        await checkAccountHealth();
+      } finally {
+        healthCheckInFlight.current = false;
+      }
+    };
+    healthTickRef.current = () => { void tick(); };
+
+    // Błąd serwera/licencji z DOWOLNEJ komendy (np. sync przy padniętym serwerze) —
+    // od razu przełączamy właściwy ekran zamiast zostawiać usera z czerwonym komunikatem.
+    const offSignal = onServerSignal((signal) => {
+      if (!loggedInRef.current) return;
+      if (signal === "unavailable") {
+        // To NIE jest domysł: realna komenda dostała 5xx/brak połączenia. Dodatkowa
+        // próba tylko opóźniała ekran awarii o kilka sekund, w których user widział
+        // mylące błędy per konto. Strike'ów pilnujemy tylko przy sondach w tle.
+        serverStrikes.current = SERVER_DOWN_STRIKES;
+        setServerUnavailable(true);
+        return;
+      }
+      void tick();
+    });
+
+    let lastFocusCheck = 0;
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusCheck < ACCOUNT_HEALTH_FOCUS_GAP_MS) return;
+      lastFocusCheck = now;
+      void tick();
+    };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
+
+    const id = window.setInterval(tick, ACCOUNT_HEALTH_CHECK_MS);
+    return () => {
+      clearInterval(id);
+      offSignal();
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
+      healthTickRef.current = null;
+    };
+    /* eslint-disable-next-line */
+  }, []);
+
+  // DEMO: nie ma realnej sesji do zamknięcia — „wylogowanie" kończy podgląd i wraca na stronę.
   async function logoutAccount() {
+    await serverLogout().catch(() => {});
+    clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
+    clearSyncProgress(OFFER_SYNC_PROGRESS_KEY);
+    setSessionExpired(false);
     window.location.assign("/");
-    setSessionExpired(false); // ręczne wylogowanie — bez straszenia komunikatem
+  }
+  async function requestLogout() {
+    await logoutAccount();
   }
   async function upgradeAccount() {
     try {
@@ -1386,7 +1281,8 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  // Podsumowanie po synchronizacji: udane znika samo po 5 s, błędne czeka na zamknięcie.
+  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(() => readSyncProgress(ORDER_SYNC_PROGRESS_KEY));
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(() => {
     const v = Number(localStorage.getItem("lastSyncAt"));
@@ -1440,18 +1336,26 @@ export default function App() {
 
   // Filtry listy zamówień (styl Ordigo): szukaj + status + kanał + kurier.
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<DerivedStatus | "all">("do_wyslania");
-  const [channelFilter, setChannelFilter] = useState<string>("all");
-  const [courierFilter, setCourierFilter] = useState<string>("all");
+  const [statusFilterState, setStatusFilterState] = useState<DerivedStatus | "all">(() => {
+    const saved = localStorage.getItem(ORDER_FILTER_STATUS_KEY) as DerivedStatus | "all" | null;
+    return saved && (saved === "all" || SEGMENTS.some((segment) => segment.key === saved)) ? saved : "do_wyslania";
+  });
+  const [channelFilterState, setChannelFilterState] = useState<string>(() => localStorage.getItem(ORDER_FILTER_CHANNEL_KEY) || "all");
+  const [courierFilterState, setCourierFilterState] = useState<string>(() => {
+    const saved = localStorage.getItem(ORDER_FILTER_COURIER_KEY);
+    return saved && (saved === "all" || COURIER_CATALOG.some((courier) => courier.id === saved)) ? saved : "all";
+  });
+  const setStatusFilter = (value: DerivedStatus | "all") => { localStorage.setItem(ORDER_FILTER_STATUS_KEY, value); setStatusFilterState(value); };
+  const setChannelFilter = (value: string) => { localStorage.setItem(ORDER_FILTER_CHANNEL_KEY, value); setChannelFilterState(value); };
+  const setCourierFilter = (value: string) => { localStorage.setItem(ORDER_FILTER_COURIER_KEY, value); setCourierFilterState(value); };
+  const statusFilter = statusFilterState;
+  const channelFilter = channelFilterState;
+  const courierFilter = courierFilterState;
   const [orderPage, setOrderPage] = useState(1);
   const [orderPageSize, setOrderPageSize] = useState(20);
   const [openOrderId, setOpenOrderId] = useState<number | null>(null);
 
   // Konfigurowalne filtry przewoźników (które pozycje pojawiają się w liście) — localStorage.
-  const [courierActiveIds, setCourierActiveIdsState] = useState<string[]>(() => {
-    try { const v = JSON.parse(localStorage.getItem("courierFilterIds") || "null"); return Array.isArray(v) && v.length ? v : DEFAULT_COURIER_IDS; } catch { return DEFAULT_COURIER_IDS; }
-  });
-  const setCourierActiveIds = (ids: string[]) => { localStorage.setItem("courierFilterIds", JSON.stringify(ids)); setCourierActiveIdsState(ids); };
   // Widoczne ikony w kolumnie „Oznaczenia" — localStorage.
   const [iconCols, setIconColsState] = useState<IconCols>(() => {
     try { const v = JSON.parse(localStorage.getItem("orderIconCols") || "null"); return v && typeof v === "object" ? { paid: true, shipment: true, invoice: true, ...v } : { paid: true, shipment: true, invoice: true }; } catch { return { paid: true, shipment: true, invoice: true }; }
@@ -1495,7 +1399,6 @@ export default function App() {
   const [erliToken, setErliToken] = useState("");
   const [erliMsg, setErliMsg] = useState("");
   const [erliBusy, setErliBusy] = useState(false);
-  const [erliName, setErliName] = useState("");
 
   // Integracja InPost Merchant (InPost Buy / inpsa) — OAuth przez serwer
   const [inpostMerchant, setInpostMerchant] = useState<{ connected: boolean }>({ connected: false });
@@ -1534,10 +1437,9 @@ export default function App() {
     setErliBusy(true);
     setErliMsg("");
     try {
-      const r = await invoke<{ connected: boolean }>("set_erli_token", { token: erliToken, accountName: erliName.trim() || null });
+      const r = await invoke<{ connected: boolean }>("set_erli_token", { token: erliToken, accountName: null });
       setErli(r);
       setErliToken("");
-      setErliName("");
       await Promise.all([loadIntegrations(), loadErli()]);
       if (r.connected) {
         setErliMsg(t(T.int_erli_connected_fetching));
@@ -1590,10 +1492,16 @@ export default function App() {
     if (syncingRef.current) return; // nie nakładaj synchronizacji (auto + ręczna)
     syncingRef.current = true;
     setSyncing(true);
-    setSyncMsg(null);
+    setSyncSummary(null);
+    // Panel postępu żyje tylko w trakcie pracy — po zakończeniu zostaje podsumowanie.
+    const finishProgress = (summary: SyncSummary | null) => {
+      clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
+      setSyncProgress(null);
+      setSyncSummary(summary);
+    };
     try {
       let progress: SyncProgressState = {
-        title: t(T.ord_sync),
+        title: t(T.sync_orders_title),
         startedAt: Date.now(),
         updatedAt: Date.now(),
         steps: [{
@@ -1624,11 +1532,11 @@ export default function App() {
       const accountSteps = orderSyncStepsFromIntegrations(freshIntegrations, t);
       const runnableSteps = accountSteps.filter((step) => step.status !== "error");
       if (accountSteps.length === 0) {
-        clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
-        setSyncProgress(null);
-        setSyncMsg({
-          text: lang === "pl" ? "Brak kont do synchronizacji zamówień." : "No accounts available for order sync.",
+        finishProgress({
           ok: false,
+          title: t(T.sync_nothing_title),
+          detail: lang === "pl" ? "Brak kont do synchronizacji zamówień." : "No accounts available for order sync.",
+          at: Date.now(),
         });
         return;
       }
@@ -1643,7 +1551,7 @@ export default function App() {
         status: "pending",
       };
       progress = {
-        title: t(T.ord_sync),
+        title: t(T.sync_orders_title),
         startedAt: progress.startedAt,
         updatedAt: Date.now(),
         steps: runnableSteps.length > 0 ? [...accountSteps, refreshStep] : accountSteps,
@@ -1660,13 +1568,13 @@ export default function App() {
 
       publishProgress(progress);
       if (runnableSteps.length === 0) {
-        clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
-        setSyncProgress(null);
-        setSyncMsg({
-          text: lang === "pl"
-            ? "Nie uruchomiono synchronizacji: konta wymagają ponownego połączenia albo mają wyłączone zbieranie zamówień."
-            : "Sync did not start: accounts need reconnecting or have order collection disabled.",
+        finishProgress({
           ok: false,
+          title: t(T.sync_nothing_title),
+          detail: lang === "pl"
+            ? "Konta wymagają ponownego połączenia albo mają wyłączone zbieranie zamówień."
+            : "Accounts need reconnecting or have order collection disabled.",
+          at: Date.now(),
         });
         return;
       }
@@ -1692,6 +1600,13 @@ export default function App() {
               : item),
           });
         } catch (error) {
+          // Serwer padł: obsługą jest ekran awarii (przełącza go onServerSignal), a nie
+          // lista błędów per konto. Nie dobijamy kolejnych kont do martwego serwera
+          // i nie zostawiamy czerwonego komunikatu, którego user nie może naprawić.
+          if (isServerUnavailableError(error)) {
+            finishProgress(null);
+            return;
+          }
           const detail = translateMessage(error, t);
           warnings.push(`${step.label}: ${detail}`);
           publishProgress({
@@ -1704,8 +1619,6 @@ export default function App() {
       markStep(refreshStep.key, "active");
       await loadOrders();
       markStep(refreshStep.key, "done");
-      clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
-      setSyncProgress(null);
 
       if (progress.accountsSynced > 0) {
         const now = new Date();
@@ -1713,15 +1626,25 @@ export default function App() {
         localStorage.setItem("lastSyncAt", String(now.getTime()));
       }
 
-      if (warnings.length > 0) {
-        setSyncMsg({ text: `Synchronizacja zakończona z błędami: ${[...new Set(warnings)].join(" | ")}`, ok: false });
-      } else {
-        setSyncMsg({ text: `Zsync: ${progress.accountsSynced} kont | ${progress.saved} zapisanych`, ok: true });
-      }
+      finishProgress(warnings.length > 0
+        ? { ok: false, title: t(T.sync_failed_title), detail: [...new Set(warnings)].join(" | "), at: Date.now() }
+        : {
+            ok: true,
+            title: t(T.sync_done_title),
+            detail: t(T.sync_done_detail, { accounts: progress.accountsSynced, fetched: progress.fetched, saved: progress.saved }),
+            at: Date.now(),
+          });
     } catch (e) {
-      clearSyncProgress(ORDER_SYNC_PROGRESS_KEY);
-      setSyncProgress(null);
-      setSyncMsg({ text: t(T.common_error_with_message, { message: translateMessage(e, t) }), ok: false });
+      if (isServerUnavailableError(e)) {
+        finishProgress(null);
+        return; // ekran awarii, bez czerwonego komunikatu w tle
+      }
+      finishProgress({
+        ok: false,
+        title: t(T.sync_failed_title),
+        detail: translateMessage(e, t),
+        at: Date.now(),
+      });
     } finally {
       syncingRef.current = false;
       setSyncing(false);
@@ -1754,7 +1677,7 @@ export default function App() {
       const deadline = Date.now() + 180_000; // czekamy do 3 min na zakończenie OAuth
       let added: Integration | null = null;
       while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 250));
+        await new Promise((r) => setTimeout(r, 250)); // DEMO: mock kończy OAuth od razu
         let list: Integration[] = [];
         try { list = await refreshIntegrations(); } catch { continue; }
         const fresh = list.find((i) => i.platform === "allegro" && !before.has(i.id));
@@ -1791,7 +1714,7 @@ export default function App() {
       const deadline = Date.now() + 180_000;
       let added: Integration | null = null;
       while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 250));
+        await new Promise((r) => setTimeout(r, 250)); // DEMO: mock kończy OAuth od razu
         let list: Integration[] = [];
         try { list = await refreshIntegrations(); } catch { continue; }
         const fresh = list.find((i) => i.platform === "inpost_merchant" && !before.has(i.id));
@@ -1816,31 +1739,7 @@ export default function App() {
   }
 
   // Opcje kanału — z realnych zamówień.
-  const channelOptions = useMemo(() => {
-    const set = new Map<string, ChannelOption>();
-    for (const order of orders) {
-      if (!order.marketplace) continue;
-      const value = channelAccountKey(order);
-      const existing = set.get(value);
-      if (existing) {
-        existing.count += 1;
-        continue;
-      }
-      set.set(value, {
-        value,
-        platform: order.marketplace,
-        platformLabel: channelLabel(order.marketplace, t),
-        accountName: order.accountName ?? "",
-        accountDisplayName: channelAccountLabel(order),
-        count: 1,
-      });
-    }
-    return [...set.values()].sort((a, b) => {
-      const byPlatform = a.platformLabel.localeCompare(b.platformLabel, "pl");
-      if (byPlatform !== 0) return byPlatform;
-      return a.accountName.localeCompare(b.accountName, "pl");
-    });
-  }, [orders, t]);
+  const channelOptions = useMemo(() => buildChannelOptions(orders, t), [orders, t]);
 
   // Filtrowanie + liczniki (status / kurier). Liczniki liczone przy pozostałych aktywnych filtrach.
   const { sorted, statusCounts, courierCounts } = useMemo(() => {
@@ -1853,7 +1752,8 @@ export default function App() {
 
     const sorted = orders.filter((o) => passStatus(o) && passChannel(o) && passCourier(o) && passSearch(o)).sort((a, b) => orderTime(b) - orderTime(a));
 
-    const preStatus = orders.filter((o) => passChannel(o) && passCourier(o) && passSearch(o));
+    // Liczniki statusów są niezależne od wybranego kuriera (suma po wszystkich kurierach).
+    const preStatus = orders.filter((o) => passChannel(o) && passSearch(o));
     const statusCounts: Record<string, number> = { all: preStatus.length };
     for (const s of SEGMENTS) statusCounts[s.key] = preStatus.filter((o) => o.derivedStatus === s.key).length;
 
@@ -1893,22 +1793,24 @@ export default function App() {
     : t(T.menu_account);
   const premium = license?.status === "PREMIUM";
   const trialDays = license?.daysLeft ?? 0;
+  // DEMO: bez potwierdzenia wylogowania — wyjście z podglądu jest bezstratne.
+  const logoutConfirmModal = null;
 
   // ── BRAMKA: konto + licencja (po wszystkich hookach) ──
   if (authLoading) {
     return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "var(--muted2)", fontFamily: "system-ui" }}>{t(T.common_loading)}</div>;
   }
   if (serverUnavailable) {
-    return <ServerDownScreen onRetry={() => { setAuthLoading(true); return loadAccount(); }} onLogout={logoutAccount} />;
+    return <><ServerDownScreen onRetry={() => { setAuthLoading(true); return loadAccount(); }} onLogout={requestLogout} />{logoutConfirmModal}</>;
   }
   if (!loggedIn) {
     return <AuthScreen onAuthed={loadAccount} notice={sessionExpired ? t(T.auth_session_expired) : undefined} />;
   }
   if (needsVerification) {
-    return <VerificationScreen onVerified={loadAccount} onLogout={logoutAccount} />;
+    return <><VerificationScreen onVerified={loadAccount} onLogout={requestLogout} />{logoutConfirmModal}</>;
   }
   if (license && license.status === "EXPIRED") {
-    return <UpgradeScreen license={license} onRefresh={loadAccount} onLogout={logoutAccount} />;
+    return <><UpgradeScreen license={license} onRefresh={loadAccount} onLogout={requestLogout} />{logoutConfirmModal}</>;
   }
 
   return (
@@ -1974,7 +1876,7 @@ export default function App() {
               <button type="button" className="ord-acct-item" onClick={() => goView("ustawienia")}>
                 <SettingsIcon size={15} /> {t(T.menu_settings)}
               </button>
-              <button type="button" className="ord-acct-item danger" onClick={() => { setAcctOpen(false); logoutAccount(); }}>
+              <button type="button" className="ord-acct-item danger" onClick={() => { setAcctOpen(false); requestLogout(); }}>
                 <LogOut size={15} /> Zakończ demo
               </button>
             </div>
@@ -1984,6 +1886,7 @@ export default function App() {
 
       {/* ── Formularz pomocy / kontaktu ── */}
       {supportOpen && <SupportModal user={acctName} email={userEmail} onClose={() => setSupportOpen(false)} />}
+      {logoutConfirmModal}
 
       {/* ── Obszar aktywnego widoku ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
@@ -2005,7 +1908,8 @@ export default function App() {
           lastSyncAt={lastSyncAt}
           onSync={sync}
           syncProgress={syncProgress}
-          syncMessage={syncMsg}
+          syncSummary={syncSummary}
+          onDismissSummary={() => setSyncSummary(null)}
           defaultPrinter={defaultPrinter}
           onOpenOrder={(orderId) => { setOpenOrderId(orderId); setView("orders"); }}
         />
@@ -2030,7 +1934,7 @@ export default function App() {
           onSyncNow={sync}
           syncing={syncing}
           onUpgrade={upgradeAccount}
-          onLogout={logoutAccount}
+          onLogout={requestLogout}
           update={update}
           updateChecking={updateChecking}
           onCheckUpdate={runUpdateCheck}
@@ -2040,7 +1944,7 @@ export default function App() {
       {/* ── INTEGRACJE ── */}
       {view === "integracje" && (
         <main style={{ flex: 1, overflow: "auto", padding: "28px 32px 60px" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ maxWidth: 1360, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 18, gap: 12, flexWrap: "wrap" }}>
             <div>
               <h2 style={{ margin: "0 0 4px" }}>{t(T.nav_integrations)}</h2>
@@ -2152,8 +2056,7 @@ export default function App() {
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Erli</div>
                             <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>{t(T.intm_erli_help)}</p>
-                            <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>{t(T.intm_account_name)}<input value={erliName} onChange={(e) => setErliName(e.target.value)} style={inputS} /></label>
-                            <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, display: "block", marginTop: 10 }}>{t(T.intm_api_key)}<input type="password" value={erliToken} onChange={(e) => setErliToken(e.target.value)} placeholder={t(T.intm_api_key_ph)} style={inputS} /></label>
+                            <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, display: "block" }}>{t(T.intm_api_key)}<input type="password" value={erliToken} onChange={(e) => setErliToken(e.target.value)} placeholder={t(T.intm_api_key_ph)} style={inputS} /></label>
                             {erli.connected && <div style={{ marginTop: 10, fontSize: 12, color: "#15803d" }}>{t(T.intm_erli_already)}</div>}
                             <button onClick={saveErliToken} disabled={erliBusy || !erliToken} style={{ marginTop: 12, background: erliBusy || !erliToken ? "var(--border)" : "var(--accent)", color: "var(--accent-contrast)", border: "none", borderRadius: 9, padding: "11px 20px", fontSize: 14, fontWeight: 700, cursor: erliBusy || !erliToken ? "not-allowed" : "pointer" }}>{erliBusy ? t(T.intm_checking) : t(T.intm_connect_erli)}</button>
                             {erliMsg && <div style={{ marginTop: 10, fontSize: 12, display: "flex", alignItems: "center", gap: 6, color: integrationMessageColor(erliMsg, erliBusy) }}>{erliBusy && !erliMsg.startsWith("✓") && <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>↻</span>}{erliMsg}</div>}
@@ -2207,16 +2110,17 @@ export default function App() {
                 <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>{t(sorted.length === 1 ? T.ord_count_one : T.ord_count_many, { n: sorted.length })}</p>
               </div>
               <div className="ord-header-actions">
-                {syncMsg && !syncMsg.ok && <span style={{ fontSize: 12, color: "#f4515b" }}>{syncMsg.text}</span>}
                 {lastSyncAt && !syncing && (
                   <span style={{ fontSize: 11, color: "var(--muted2)" }}>
                     {t(T.ord_synced_at, { time: lastSyncAt.toLocaleTimeString(lang === "en" ? "en-GB" : "pl-PL", { hour: "2-digit", minute: "2-digit" }) })}
                   </span>
                 )}
                 <SyncButton syncing={syncing} onSync={sync} />
-                {syncProgress && <SyncProgress progress={syncProgress} />}
+                {syncProgress && <SyncProgressPanel progress={syncProgress} />}
               </div>
             </div>
+
+            {syncSummary && <SyncSummaryBanner summary={syncSummary} onDismiss={() => setSyncSummary(null)} />}
 
             {/* Filtry: szukaj + status + kanał + kurier */}
             <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
@@ -2241,9 +2145,9 @@ export default function App() {
                 <label htmlFor="ord-channel">{t(T.ord_channel)}</label>
                 <ChannelFilterSelect value={channelFilter} options={channelOptions} onChange={(next) => { setChannelFilter(next); setOrderPage(1); }} />
               </div>
-              <div className="field">
+              <div className="field ord-courier-field">
                 <label>{t(T.ord_courier)}</label>
-                <CourierFilterSelect value={courierFilter} onChange={(value) => { setCourierFilter(value); setOrderPage(1); }} activeIds={courierActiveIds} setActiveIds={setCourierActiveIds} counts={courierCounts} />
+                <CourierFilterPanel value={courierFilter} onChange={(value) => { setCourierFilter(value); setOrderPage(1); }} counts={courierCounts} />
               </div>
             </div>
 

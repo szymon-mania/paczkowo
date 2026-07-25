@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { serverLogin, serverRegister, confirmRegistration, serverCheckout, googleLogin, verificationStatus, resendEmailCode, verifyEmailCode, resendPhoneCode, verifyPhoneCode, type License } from "../lib/accountApi";
+import { invoke } from "../lib/serverStatus";
+import { serverLogin, serverRegister, confirmRegistration, serverCheckout, googleLogin, verificationStatus, resendEmailCode, verifyEmailCode, resendPhoneCode, verifyPhoneCode, getRecentLoginEmails, rememberLoginEmail, type License } from "../lib/accountApi";
 import { PhoneField } from "../components/PhoneField";
 import { LanguageSelect } from "../components/LanguageSelect";
 import DevTerminal, { writeFrontendDevLog } from "../components/DevTerminal";
@@ -32,20 +32,40 @@ export function AuthScreen({ onAuthed, notice }: { onAuthed: () => void; notice?
   const [registrationToken, setRegistrationToken] = useState("");
   const [registrationEmailCode, setRegistrationEmailCode] = useState("");
   const [registrationPhoneCode, setRegistrationPhoneCode] = useState("");
+  const [recentEmails, setRecentEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    getRecentLoginEmails()
+      .then((emails) => {
+        setRecentEmails(emails);
+        if (!email && emails.length) setEmail(emails[0]);
+      })
+      .catch(() => {});
+    /* eslint-disable-next-line */
+  }, []);
+
+  async function rememberEmail(emailToRemember: string) {
+    const normalized = emailToRemember.trim().toLowerCase();
+    if (!normalized) return;
+    await rememberLoginEmail(normalized).catch(() => {});
+    setRecentEmails((emails) => [normalized, ...emails.filter((item) => item !== normalized)].slice(0, 8));
+  }
 
   async function submit() {
     setBusy(true);
     setErr("");
+    const normalizedEmail = email.trim().toLowerCase();
     try {
       if (mode === "register") {
-        const pending = await serverRegister(email.trim(), password, name.trim(), surname.trim(), phone.trim(), company.trim() || undefined);
+        const pending = await serverRegister(normalizedEmail, password, name.trim(), surname.trim(), phone.trim(), company.trim() || undefined);
         if (!pending.registrationToken) throw new Error(T.err_registration_token_missing);
         setRegistrationToken(pending.registrationToken);
         return;
       } else {
-        await serverLogin(email.trim(), password);
+        await serverLogin(normalizedEmail, password);
+        await rememberEmail(normalizedEmail);
       }
-      localStorage.setItem("userEmail", email.trim());
+      localStorage.setItem("userEmail", normalizedEmail);
       onAuthed();
     } catch (e) {
       setErr(translateMessage(e, t));
@@ -78,8 +98,10 @@ export function AuthScreen({ onAuthed, notice }: { onAuthed: () => void; notice?
     setBusy(true);
     setErr("");
     try {
-      await confirmRegistration(registrationToken, registrationEmailCode.trim(), registrationPhoneCode.trim(), email.trim());
-      localStorage.setItem("userEmail", email.trim());
+      const normalizedEmail = email.trim().toLowerCase();
+      await confirmRegistration(registrationToken, registrationEmailCode.trim(), registrationPhoneCode.trim(), normalizedEmail);
+      await rememberEmail(normalizedEmail);
+      localStorage.setItem("userEmail", normalizedEmail);
       onAuthed();
     } catch (e) {
       setErr(translateMessage(e, t));
@@ -136,7 +158,23 @@ export function AuthScreen({ onAuthed, notice }: { onAuthed: () => void; notice?
               <label style={lbl}>{t(T.auth_last_name)}<input className="input" value={surname} onChange={(e) => setSurname(e.target.value)} style={{ marginTop: 4 }} required /></label>
             </div>
           )}
-          <label style={lbl}>{t(T.auth_email)}<input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginTop: 4 }} required /></label>
+          <label style={lbl}>{t(T.auth_email)}<input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginTop: 4 }} list="recent-login-emails" autoComplete="email" required />
+            <datalist id="recent-login-emails">
+              {recentEmails.map((item) => <option key={item} value={item} />)}
+            </datalist>
+          </label>
+          {mode === "login" && recentEmails.length > 0 && (
+            <div style={{ margin: "-4px 0 10px" }}>
+              <div className="text-muted" style={{ fontSize: 11, marginBottom: 6 }}>{t(T.auth_recent_emails)}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {recentEmails.map((item) => (
+                  <button key={item} type="button" className="btn btn-secondary" style={{ padding: "5px 8px", fontSize: 11 }} onClick={() => setEmail(item)} title={t(T.auth_use_email, { email: item })}>
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <label style={lbl}>{t(T.auth_password)}<input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginTop: 4 }} required minLength={mode === "register" ? 10 : 6} maxLength={72} /></label>
           {mode === "register" && (
             <>
