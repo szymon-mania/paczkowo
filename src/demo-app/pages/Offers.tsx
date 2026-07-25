@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, CirclePause, CircleStop, DownloadCloud, Pencil, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CheckCircle2, CirclePause, CircleStop, DownloadCloud, Pencil, Play, Plus, Trash2 } from "lucide-react";
 
 import AllegroOfferEditor from "../components/AllegroOfferEditor";
 import InpostMerchantOfferEditor from "../components/InpostMerchantOfferEditor";

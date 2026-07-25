@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, CircleDollarSign, ClipboardCheck, Copy, DownloadCloud, Eye, FileText, PackageCheck, Pencil, Plus, Printer, Send, Trash2, X } from "lucide-react";
+import { Check, CircleDollarSign, ClipboardCheck, Copy, DownloadCloud, Eye, FileText, PackageCheck, Pencil, Printer, Send, Trash2, X } from "lucide-react";
 
 import { CommerceHeader, CommerceModal, CommercePage, CommercePagination, EmptyTable, Field, KpiStrip, StatusPill } from "../components/CommerceUi";
 import { IntegrationImportList, platformLabel as platformName } from "../components/IntegrationImport";
@@ -119,6 +119,12 @@ export default function Returns() {
       .catch(() => setIntegrations(integrationsCache ?? []));
   }, []);
   const reload = () => load(true);
+  // Otwarte szczegóły muszą pokazywać skutek akcji (wniosek, etykieta, refundacja).
+  useEffect(() => {
+    if (!details) return;
+    const fresh = rows.find((row) => row.id === details.id);
+    if (fresh && fresh !== details) setDetails(fresh);
+  }, [rows]);
 
   const accountKeyOf = (row: ReturnCase) => `${row.sourcePlatform}::${row.accountName ?? ""}`;
   const filtered = useMemo(() => {
@@ -668,7 +674,7 @@ export default function Returns() {
                   <p>{t(T.return_bank_hint)}</p>
                   <div><span>{t(T.return_bank_owner)}</span><strong>{details.refundBankAccount.owner ?? "-"}</strong></div>
                   <div><span>{t(T.return_bank_number)}</span><strong>{details.refundBankAccount.iban ?? details.refundBankAccount.accountNumber}</strong></div>
-                  {details.refundBankAccount.address && <div><span>{t(T.return_field_customer)}</span><strong>{details.refundBankAccount.address}</strong></div>}
+                  {details.refundBankAccount.address && <p>{details.refundBankAccount.address}</p>}
                   <div className="return-detail-actions">
                     <button type="button" className="btn btn-secondary" onClick={() => void copyToClipboard(details.refundBankAccount?.iban ?? details.refundBankAccount?.accountNumber ?? "")}>
                       <Copy size={15} />{t(T.return_bank_copy)}
