@@ -22,7 +22,7 @@ export default function ContactForm() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Kategoria z adresu ustawiana po hydracji — React nie poprawia wartości pól przy hydracji.
+  // Kategoria z adresu ustawiana po hydracji: React nie poprawia wartości pól formularza.
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get("kategoria");
     const preset = param && categoryByParam[param.toLowerCase()];

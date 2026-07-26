@@ -16,13 +16,15 @@ function mulberry32(seed: number) {
 }
 
 const IMG = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=200&q=70`;
+// Wersja dla ofert i edytorów — miniatura 200 px byłaby rozmyta w podglądzie zdjęcia.
+const IMG_LG = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=600&q=80`;
 const PRODUCTS: { name: string; sku: string; price: number; img: string }[] = [
   { name: "Etui silikonowe iPhone 15 Pro", sku: "ETUI-IP15P-BLK", price: 34.99, img: IMG("photo-1592286927505-1def25115558") },
   { name: "Kabel USB-C 2m 100W", sku: "KAB-USBC-2M", price: 24.5, img: IMG("photo-1600490722773-35753aea6332") },
   { name: "Szkło hartowane Galaxy S24", sku: "SZK-S24", price: 19.99, img: IMG("photo-1601784551446-20c9e07cdbdb") },
   { name: "Ładowarka GaN 65W", sku: "LAD-GAN65", price: 89.0, img: IMG("photo-1583863788434-e58a36330cf0") },
   { name: "Uchwyt samochodowy MagSafe", sku: "UCH-MAGSAFE", price: 59.9, img: IMG("photo-1617997455403-41f333d44d5b") },
-  { name: "Powerbank 20000 mAh", sku: "PB-20K", price: 119.0, img: IMG("photo-1609592806596-b43bada2f4bb") },
+  { name: "Powerbank 20000 mAh", sku: "PB-20K", price: 119.0, img: IMG("photo-1585995603413-eb35b5f4a50b") },
   { name: "Słuchawki BT dokanałowe", sku: "SLU-BT-IN", price: 149.0, img: IMG("photo-1590658268037-6bf12165a8df") },
 ];
 const CARRIERS = ["inpost", "dpd", "dhl", "orlen"];
@@ -133,12 +135,15 @@ const DEMO_STREETS = ["ul. Długa 14", "ul. Polna 8", "ul. Leśna 22", "ul. Kró
 const DEMO_SHIPMENT_STATUSES = ["CREATED", "IN_TRANSIT", "READY_FOR_PICKUP", "DELIVERED"] as const;
 
 function demoService(carrier: string, marketplace: string) {
-  if (marketplace === "erli") return "ERLI - przesyłka marketplace";
-  if (carrier === "inpost") return "InPost Paczkomat 24/7";
-  if (carrier === "dpd") return "DPD Kurier";
-  if (carrier === "dhl") return "DHL Parcel";
-  if (carrier === "orlen") return "ORLEN Paczka";
-  return "Kurier standardowy";
+  const service =
+    carrier === "inpost" ? "InPost Paczkomat 24/7" :
+    carrier === "dpd" ? "DPD Kurier" :
+    carrier === "dhl" ? "DHL Parcel" :
+    carrier === "orlen" ? "ORLEN Paczka" :
+    "Kurier standardowy";
+  // Erli nadaje z umowy marketplace, ale paczkę wiezie konkretny przewoźnik — bez
+  // jego nazwy filtr kuriera wyglądał na zepsuty („InPost" pokazywał wiersze „ERLI").
+  return marketplace === "erli" ? `ERLI · ${service}` : service;
 }
 
 function demoTrackingNumber(carrier: string, seed: number) {
@@ -228,13 +233,13 @@ function decorateDemoOrders(orders: Order[]): Order[] {
 function makeOffers(): Offer[] {
   const base = { sourcePlatform: "manual", syncStatus: "LOCAL_ONLY" as const, currency: "PLN", taxRate: "23", conditionCode: "NEW", validationIssues: [], revision: 1, createdAt: isoAt(-35) };
   return [
-    { ...base, id: 1, sourcePlatform: "allegro", accountName: "moj_sklep_pl", externalOfferId: "15800000001", syncStatus: "SYNCED", externalUpdatedAt: isoAt(-1), title: "Ładowarka GaN 65W USB-C", sku: "LAD-GAN65", ean: "5901234567001", status: "ACTIVE", priceAmount: 89, availableQuantity: 42, category: "Elektronika > Ładowarki", brand: "Voltio", description: "Kompaktowa ładowarka z dwoma portami USB-C.", primaryImageUrl: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80", updatedAt: isoAt(-1) },
-    { ...base, id: 2, title: "Powerbank 20000 mAh PD", sku: "PB-20K", ean: "5901234567002", status: "READY", priceAmount: 119, availableQuantity: 18, category: "Elektronika > Powerbanki", brand: "Voltio", updatedAt: isoAt(-2) },
-    { ...base, id: 3, title: "Uchwyt samochodowy MagSafe", sku: "UCH-MAGSAFE", ean: "5901234567003", status: "PAUSED", priceAmount: 59.9, availableQuantity: 0, category: "Motoryzacja > Uchwyty", brand: "Roadly", updatedAt: isoAt(-4) },
-    { ...base, id: 4, title: "Kabel USB-C 2 m 100W", sku: "KAB-USBC-2M", status: "DRAFT", priceAmount: 24.5, availableQuantity: 120, category: "Elektronika > Kable", brand: "Voltio", updatedAt: isoAt(-6) },
-    { ...base, id: 5, title: "Szkło hartowane Galaxy S24", sku: "SZK-S24", status: "ERROR", priceAmount: 19.99, availableQuantity: 64, category: "Telefony > Ochrona ekranu", brand: "Clearly", validationIssues: [{ code: "MISSING_GTIN", severity: "ERROR", messageKey: "offer_gtin_required", path: "ean" }], updatedAt: isoAt(-1) },
-    { ...base, id: 6, sourcePlatform: "inpost_merchant", accountName: "org-demo-2026", externalOfferId: "inpost-offer-42", syncStatus: "SYNCED", externalUpdatedAt: isoAt(-1), title: "Powerbank 20000 mAh PD", sku: "PB-20K", ean: "5901234567002", status: "ACTIVE", priceAmount: 119, availableQuantity: 18, category: "mobile-accessories", brand: "Voltio", description: "Powerbank z szybkim ładowaniem USB-C Power Delivery.", primaryImageUrl: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80", updatedAt: isoAt(-1) },
-    { ...base, id: 7, sourcePlatform: "erli", accountName: "moj_sklep_erli", externalOfferId: "ERLI-1001", syncStatus: "SYNCED", externalUpdatedAt: isoAt(-1), title: "Uchwyt samochodowy MagSafe", sku: "UCH-MAGSAFE", ean: "5901234567003", status: "ACTIVE", priceAmount: 59.9, availableQuantity: 24, taxRate: "UNKNOWN", description: "Magnetyczny uchwyt samochodowy z obsługą MagSafe.", primaryImageUrl: "https://images.unsplash.com/photo-1617997455403-41f333d44d5b?auto=format&fit=crop&w=600&q=80", updatedAt: isoAt(-1) },
+    { ...base, id: 1, sourcePlatform: "allegro", accountName: "moj_sklep_pl", externalOfferId: "15800000001", syncStatus: "SYNCED", externalUpdatedAt: isoAt(-1), title: "Ładowarka GaN 65W USB-C", sku: "LAD-GAN65", ean: "5901234567001", status: "ACTIVE", priceAmount: 89, availableQuantity: 42, category: "Elektronika > Ładowarki", brand: "Voltio", description: "Kompaktowa ładowarka z dwoma portami USB-C.", primaryImageUrl: IMG_LG("photo-1583863788434-e58a36330cf0"), updatedAt: isoAt(-1) },
+    { ...base, id: 2, title: "Powerbank 20000 mAh PD", sku: "PB-20K", ean: "5901234567002", status: "READY", priceAmount: 119, availableQuantity: 18, category: "Elektronika > Powerbanki", brand: "Voltio", primaryImageUrl: IMG_LG("photo-1585995603413-eb35b5f4a50b"), updatedAt: isoAt(-2) },
+    { ...base, id: 3, title: "Uchwyt samochodowy MagSafe", sku: "UCH-MAGSAFE", ean: "5901234567003", status: "PAUSED", priceAmount: 59.9, availableQuantity: 0, category: "Motoryzacja > Uchwyty", brand: "Roadly", primaryImageUrl: IMG_LG("photo-1617997455403-41f333d44d5b"), updatedAt: isoAt(-4) },
+    { ...base, id: 4, title: "Kabel USB-C 2 m 100W", sku: "KAB-USBC-2M", status: "DRAFT", priceAmount: 24.5, availableQuantity: 120, category: "Elektronika > Kable", brand: "Voltio", primaryImageUrl: IMG_LG("photo-1600490722773-35753aea6332"), updatedAt: isoAt(-6) },
+    { ...base, id: 5, title: "Szkło hartowane Galaxy S24", sku: "SZK-S24", status: "ERROR", priceAmount: 19.99, availableQuantity: 64, category: "Telefony > Ochrona ekranu", brand: "Clearly", validationIssues: [{ code: "MISSING_GTIN", severity: "ERROR", messageKey: "offer_gtin_required", path: "ean" }], primaryImageUrl: IMG_LG("photo-1601784551446-20c9e07cdbdb"), updatedAt: isoAt(-1) },
+    { ...base, id: 6, sourcePlatform: "inpost_merchant", accountName: "org-demo-2026", externalOfferId: "inpost-offer-42", syncStatus: "SYNCED", externalUpdatedAt: isoAt(-1), title: "Powerbank 20000 mAh PD", sku: "PB-20K", ean: "5901234567002", status: "ACTIVE", priceAmount: 119, availableQuantity: 18, category: "mobile-accessories", brand: "Voltio", description: "Powerbank z szybkim ładowaniem USB-C Power Delivery.", primaryImageUrl: IMG_LG("photo-1585995603413-eb35b5f4a50b"), updatedAt: isoAt(-1) },
+    { ...base, id: 7, sourcePlatform: "erli", accountName: "moj_sklep_erli", externalOfferId: "ERLI-1001", syncStatus: "SYNCED", externalUpdatedAt: isoAt(-1), title: "Uchwyt samochodowy MagSafe", sku: "UCH-MAGSAFE", ean: "5901234567003", status: "ACTIVE", priceAmount: 59.9, availableQuantity: 24, taxRate: "UNKNOWN", description: "Magnetyczny uchwyt samochodowy z obsługą MagSafe.", primaryImageUrl: IMG_LG("photo-1617997455403-41f333d44d5b"), updatedAt: isoAt(-1) },
   ];
 }
 
