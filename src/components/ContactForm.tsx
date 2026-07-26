@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 const WEB3FORMS_ENDPOINT = "https://api.web3forms.com/submit";
 const WEB3FORMS_ACCESS_KEY =
@@ -6,12 +6,28 @@ const WEB3FORMS_ACCESS_KEY =
   "867d978c-740c-454a-ba07-80f58f3e6984";
 
 const categories = ["Pytanie", "Pomoc techniczna", "Błąd w aplikacji", "Prośba o integrację", "Inne"];
+
+/** Kategorie wybierane z adresu, np. /kontakt?kategoria=integracja#formularz. */
+const categoryByParam: Record<string, string> = {
+  integracja: "Prośba o integrację",
+  pomoc: "Pomoc techniczna",
+  blad: "Błąd w aplikacji",
+};
+
 type Status = "idle" | "sending" | "success" | "error";
 
 export default function ContactForm() {
+  const [category, setCategory] = useState(categories[0]);
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // Kategoria z adresu ustawiana po hydracji — React nie poprawia wartości pól przy hydracji.
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get("kategoria");
+    const preset = param && categoryByParam[param.toLowerCase()];
+    if (preset) setCategory(preset);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,7 +37,6 @@ export default function ContactForm() {
     const values = new FormData(form);
     const name = String(values.get("name") ?? "").trim();
     const email = String(values.get("email") ?? "").trim();
-    const category = String(values.get("category") ?? "Pytanie");
     const subject = String(values.get("subject") ?? "").trim();
     const content = message.trim();
 
@@ -78,8 +93,8 @@ export default function ContactForm() {
       <div className="grid gap-5 sm:grid-cols-[0.8fr_1.2fr]">
         <label className="block text-sm font-medium text-slate-200">
           Kategoria
-          <select name="category" className="mt-2 w-full border border-white/15 bg-[#10101a] px-3.5 py-3 text-white outline-none transition focus:border-brand-300">
-            {categories.map((category) => <option key={category}>{category}</option>)}
+          <select name="category" value={category} onChange={(event) => setCategory(event.target.value)} className="mt-2 w-full border border-white/15 bg-[#10101a] px-3.5 py-3 text-white outline-none transition focus:border-brand-300">
+            {categories.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </label>
         <label className="block text-sm font-medium text-slate-200">

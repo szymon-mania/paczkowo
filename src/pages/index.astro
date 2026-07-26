@@ -1,39 +1,46 @@
 ---
 import Layout from "../layouts/Layout.astro";
 
-const features = [
-  { number: "01", title: "Wspólna kolejka", text: "Wszystkie zamówienia w jednym widoku." },
-  { number: "02", title: "Szybsza wysyłka", text: "Etykiety i statusy bez ręcznego przepisywania." },
-  { number: "03", title: "Magazyn pod ręką", text: "Stany i produkty tam, gdzie obsługujesz sprzedaż." },
-  { number: "04", title: "Dane pod kontrolą", text: "Łączysz tylko wybrane konta i możesz odłączyć integrację, kiedy chcesz." },
+const modules = [
+  { number: "01", title: "Zamówienia", text: "Allegro, Erli i InPost Merchant w jednej kolejce." },
+  { number: "02", title: "Wysyłka", text: "Etykiety InPost z zamówienia, bez przepisywania adresu." },
+  { number: "03", title: "Faktury KSeF", text: "FA(3) z zamówienia, statusy wprost z KSeF." },
+  { number: "04", title: "Zwroty i magazyn", text: "RMA, refundacje, stany i alerty niskiego stanu." },
 ];
 
 const workflow = [
-  ["Połącz", "Dodaj konta sprzedażowe."],
-  ["Obsłuż", "Wybierz zamówienia do działania."],
-  ["Nadaj", "Przygotuj paczki i wyślij."],
+  ["Połącz konta", "Allegro, Erli, InPost, fakturowanie."],
+  ["Obsłuż zamówienia", "Jedna kolejka, filtry, dane do wysyłki."],
+  ["Nadaj i rozlicz", "Etykieta, numer śledzenia, faktura w KSeF."],
+];
+
+const facts = [
+  ["150 zł / mies.", "Jeden plan, bez limitu kont"],
+  ["14 dni", "Za darmo, bez karty"],
+  ["Windows", "Aplikacja na komputer"],
 ];
 ---
 
-<Layout title="Paczkowo - OMS dla e-commerce" description="Paczkowo łączy zamówienia, wysyłkę i magazyn w jednym miejscu.">
+<Layout title="Paczkowo - OMS dla e-commerce" description="Paczkowo to jedna aplikacja na zamówienia, wysyłkę, magazyn, faktury KSeF i zwroty. 150 zł miesięcznie, bez limitu kont.">
   <main>
     <section class="border-b border-white/10">
       <div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-8 lg:py-24">
         <div>
-          <p class="eyebrow">Paczkowo dla e-commerce</p>
-          <h1 class="mt-5 max-w-xl text-5xl font-bold leading-[1.02] text-white sm:text-6xl">Zamówienia, wysyłka i magazyn. Razem.</h1>
-          <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">Proste, konkretne narzędzie do codziennej sprzedaży. Mniej paneli, więcej paczek wysłanych na czas.</p>
+          <p class="eyebrow">Jedna aplikacja zamiast czterech</p>
+          <h1 class="mt-5 max-w-xl text-5xl font-bold leading-[1.02] text-white sm:text-6xl">Zamówienia, wysyłka, faktury i zwroty. W jednym oknie.</h1>
+          <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">Sprzedaż z Allegro i Erli, etykiety InPost, faktury w KSeF, magazyn i zwroty — bez przeklejania danych między panelami i bez trzech osobnych subskrypcji.</p>
           <div class="mt-9 flex flex-col gap-3 sm:flex-row">
             <a href="/demo" class="inline-flex items-center justify-center gap-2 bg-brand-500 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-brand-400">Otwórz demo <span aria-hidden="true">→</span></a>
             <a href="/pobierz" class="inline-flex items-center justify-center border border-white/15 px-5 py-3.5 text-sm font-semibold text-white transition hover:border-white/35 hover:bg-white/5">Wypróbuj 14 dni</a>
           </div>
-          <div class="mt-8 border-l border-brand-400/40 pl-4 text-sm leading-6 text-slate-400"><span class="font-semibold text-slate-200">Bezpieczeństwo danych.</span> Łączysz tylko wybrane konta i pracujesz na dostępach, które kontrolujesz.</div>
-          <div class="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-400"><span>Integracje:</span><img src="/brand/allegro.png" alt="Allegro" class="h-5 w-auto object-contain" /><img src="/brand/erli.png" alt="Erli" class="h-5 w-auto object-contain" /><img src="/brand/inpost.png" alt="InPost" class="h-6 w-auto object-contain" /></div>
+          <dl class="mt-9 grid gap-6 border-t border-white/10 pt-6 sm:grid-cols-3">
+            {facts.map(([value, label]) => <div><dt class="text-base font-semibold text-white">{value}</dt><dd class="mt-1 text-sm leading-6 text-slate-400">{label}</dd></div>)}
+          </dl>
+          <div class="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-400"><span>Integracje:</span><img src="/brand/allegro.png" alt="Allegro" class="h-5 w-auto object-contain" /><img src="/brand/erli.png" alt="Erli" class="h-5 w-auto object-contain" /><img src="/brand/inpost.png" alt="InPost" class="h-6 w-auto object-contain" /><a href="/integracje" class="font-medium text-brand-300 transition hover:text-white">Wszystkie →</a></div>
         </div>
         <a href="/demo" class="group border border-white/10 bg-[#12121d] p-6 transition hover:border-brand-300 sm:p-8" aria-label="Otwórz interaktywne demo Paczkowo">
-          <div class="flex items-center justify-between border-b border-white/10 pb-5"><span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Interaktywne demo</span><span class="text-sm text-slate-500">Dane przykładowe</span></div>
+          <div class="border-b border-white/10 pb-5"><span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Interaktywne demo</span></div>
           <h2 class="mt-12 max-w-md text-4xl font-bold leading-tight text-white">Zobacz aplikację, zanim ją pobierzesz.</h2>
-          <p class="mt-5 max-w-md text-sm leading-7 text-slate-400">Klikaj, dodaj konto Allegro i obsłuż kilkadziesiąt przykładowych zamówień. Bez logowania i bez połączenia z Twoimi danymi.</p>
           <span class="mt-12 inline-flex bg-white px-5 py-3 text-sm font-semibold text-brand-800 transition group-hover:bg-brand-50">Uruchom demo →</span>
         </a>
       </div>
@@ -49,14 +56,14 @@ const workflow = [
     </section>
 
     <section class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-      <div class="flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><p class="eyebrow">Najważniejsze</p><h2 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Prosto. Konkretnie. Gotowe do pracy.</h2></div><a href="/funkcje" class="text-sm font-semibold text-brand-300 transition hover:text-white">Wszystkie funkcje →</a></div>
+      <div class="flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><p class="eyebrow">Moduły</p><h2 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Wszystko, co dzieje się po sprzedaży.</h2></div><a href="/funkcje" class="text-sm font-semibold text-brand-300 transition hover:text-white">Wszystkie funkcje →</a></div>
       <div class="mt-12 grid gap-px border border-white/10 bg-white/10 md:grid-cols-2 lg:grid-cols-4">
-        {features.map((feature) => <article class="bg-[#0f0f18] p-7"><span class="text-sm font-semibold text-brand-300">{feature.number}</span><h3 class="mt-8 text-xl font-semibold text-white">{feature.title}</h3><p class="mt-3 text-sm leading-6 text-slate-400">{feature.text}</p></article>)}
+        {modules.map((module) => <article class="bg-[#0f0f18] p-7"><span class="text-sm font-semibold text-brand-300">{module.number}</span><h3 class="mt-8 text-xl font-semibold text-white">{module.title}</h3><p class="mt-3 text-sm leading-6 text-slate-400">{module.text}</p></article>)}
       </div>
     </section>
 
     <section class="border-y border-white/10 bg-brand-600">
-      <div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8"><div><p class="text-sm font-semibold text-brand-100">14 dni za darmo. Bez karty płatniczej.</p><h2 class="mt-3 text-3xl font-bold text-white">Pełna funkcjonalność. Bez ograniczeń.</h2></div><a href="/pobierz" class="inline-flex shrink-0 items-center justify-center bg-white px-5 py-3.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50">Wypróbuj przez 14 dni</a></div>
+      <div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8"><div><p class="text-sm font-semibold text-brand-100">14 dni za darmo, potem 150 zł miesięcznie.</p><h2 class="mt-3 text-3xl font-bold text-white">Sprawdź na własnych zamówieniach.</h2></div><a href="/pobierz" class="inline-flex shrink-0 items-center justify-center bg-white px-5 py-3.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50">Wypróbuj przez 14 dni</a></div>
     </section>
   </main>
 </Layout>

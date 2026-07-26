@@ -3,8 +3,8 @@ import Logo from "./Logo.astro";
 const year = new Date().getFullYear();
 const columns = [
   { title: "Produkt", links: [{ href: "/demo", label: "Demo aplikacji" }, { href: "/funkcje", label: "Funkcje" }, { href: "/integracje", label: "Integracje" }, { href: "/cennik", label: "Cennik" }, { href: "/pobierz", label: "Pobierz dla Windows" }] },
-  { title: "Pomoc", links: [{ href: "/kontakt", label: "Pomoc i kontakt" }, { href: "/allegro-api-info", label: "Integracja z Allegro API" }] },
-  { title: "Dokumenty", links: [{ href: "/warunki-korzystania", label: "Warunki korzystania" }, { href: "/polityka-prywatnosci", label: "Polityka prywatności" }] },
+  { title: "Pomoc", links: [{ href: "/kontakt", label: "Pomoc i kontakt" }, { href: "/kontakt?kategoria=integracja#formularz", label: "Poproś o integrację" }] },
+  { title: "Dokumenty", links: [{ href: "/warunki-korzystania", label: "Warunki korzystania" }, { href: "/polityka-prywatnosci", label: "Polityka prywatności" }, { href: "/allegro-api-info", label: "Integracja z Allegro API" }] },
 ];
 ---
 
@@ -13,7 +13,7 @@ const columns = [
     <div class="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
       <div class="lg:col-span-2">
         <Logo />
-        <p class="mt-4 max-w-sm text-sm leading-6 text-slate-400">Desktopowy system OMS dla sprzedawców, którzy chcą mieć zamówienia, wysyłki i magazyn w jednym miejscu.</p>
+        <p class="mt-4 max-w-sm text-sm leading-6 text-slate-400">Aplikacja na Windows dla sprzedawców: zamówienia, wysyłka, magazyn, faktury KSeF i zwroty w jednym oknie.</p>
       </div>
       {columns.map((column) => <div><h2 class="text-sm font-semibold text-white">{column.title}</h2><ul class="mt-4 space-y-3">{column.links.map((link) => <li><a href={link.href} class="text-sm text-slate-400 transition hover:text-brand-300">{link.label}</a></li>)}</ul></div>)}
     </div>

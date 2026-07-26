@@ -2,30 +2,33 @@
 import Layout from "../layouts/Layout.astro";
 
 const included = [
-  "14 dni za darmo",
-  "150 zł miesięcznie po okresie próbnym",
-  "Jeden plan: Paczkowo Standard",
-  "Bez limitu kont i KSeF",
+  "Zamówienia z Allegro, Erli i InPost Merchant w jednej kolejce",
+  "Etykiety i nadania InPost ShipX z Twojej umowy",
+  "Faktury FA(3), korekty i wysyłka do KSeF",
+  "Magazyn: stany, dostawy, lokalizacje i alerty niskiego stanu",
+  "Zwroty i reklamacje od zgłoszenia do refundacji",
+  "Edycja cen, stanów i opisów ofert w podłączonych kanałach",
+  "Bez limitu kont sprzedażowych, zamówień i faktur",
 ];
 ---
 
-<Layout title="Cennik Paczkowo" description="Paczkowo Standard: 14 dni za darmo bez karty płatniczej, potem 150 zł miesięcznie.">
+<Layout title="Cennik Paczkowo" description="Paczkowo: 14 dni za darmo, potem 150 zł miesięcznie. Jeden plan, bez limitu kont i faktur.">
   <main>
     <section class="border-b border-white/10">
       <div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-8 lg:py-24">
         <div>
           <p class="eyebrow">Cennik</p>
-          <h1 class="mt-5 max-w-3xl text-5xl font-bold leading-tight text-white sm:text-6xl">Paczkowo Standard</h1>
-          <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">14 dni za darmo. Bez karty płatniczej. Potem 150 zł miesięcznie.</p>
+          <h1 class="mt-5 max-w-3xl text-5xl font-bold leading-tight text-white sm:text-6xl">Jeden plan. 150 zł miesięcznie.</h1>
+          <p class="mt-6 max-w-xl text-lg leading-8 text-slate-300">Pierwsze 14 dni za darmo. Wszystkie moduły od pierwszego dnia — bez pakietów, dopłat za konta i limitu faktur.</p>
         </div>
         <article class="surface-line p-6 sm:p-8">
           <div class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
             <div>
               <p class="text-sm font-semibold text-brand-300">Paczkowo Standard</p>
               <h2 class="mt-3 text-5xl font-bold text-white">150 zł</h2>
-              <p class="mt-2 text-sm text-slate-400">miesięcznie</p>
+              <p class="mt-2 text-sm text-slate-400">miesięcznie, po okresie próbnym</p>
             </div>
-            <span class="border border-brand-300/40 bg-brand-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-200">Bez karty</span>
+            <span class="border border-brand-300/40 bg-brand-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-200">Pierwsze 14 dni za darmo</span>
           </div>
           <ul class="mt-8 grid gap-3">
             {included.map((item) => (
@@ -36,6 +39,7 @@ const included = [
             ))}
           </ul>
           <a href="/pobierz" class="mt-8 inline-flex justify-center bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-500">Wypróbuj przez 14 dni</a>
+          <p class="mt-4 text-sm text-slate-400">Bez karty płatniczej przy rejestracji.</p>
         </article>
       </div>
     </section>
