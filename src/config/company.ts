@@ -8,7 +8,7 @@ export const company = {
   site: "paczkowo.net",
   hosting: "OVH Sp. z o.o. (ovh.pl)",
   /** Data widoczna jako „Ostatnia aktualizacja" w obu dokumentach. */
-  updated: "25 lipca 2026",
+  updated: "29 lipca 2026",
 } as const;
 
 /** „Katarzyna Mania, ul. Skrajna 1, 64-610 Rogoźno, NIP: …", NIP tylko gdy uzupełniony. */
