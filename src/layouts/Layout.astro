@@ -1,5 +1,7 @@
 ---
 import "../styles/global.css";
+import Logo from "../components/Logo.astro";
+import { company } from "../config/company";
 
 interface Props {
   title?: string;
@@ -8,17 +10,12 @@ interface Props {
   chrome?: boolean;
 }
 
-const {
-  title = "Paczkowo | Zamówienia, wysyłka i magazyn w jednym oknie",
-  description =
-    "Paczkowo to desktopowe narzędzie (Tauri) do obsługi zamówień z Allegro i Erli, automatycznych etykiet InPost oraz zarządzania magazynem z wielu kont w jednym miejscu.",
-  chrome = true,
-} = Astro.props;
-
-import Header from "../components/Header.astro";
-import Footer from "../components/Footer.astro";
+Astro.props satisfies Props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const title = "Paczkowo - wracamy z nową wersją";
+const description =
+  "Paczkowo jest chwilowo niedostępne, bo budujemy nową odsłonę produktu.";
 ---
 
 <!doctype html>
@@ -52,8 +49,38 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     </script>
   </head>
   <body class="site-shell min-h-screen">
-    {chrome && <Header />}
-    <slot />
-    {chrome && <Footer />}
+    <main class="flex min-h-screen items-center px-4 py-12 sm:px-6 lg:px-8">
+      <section class="mx-auto w-full max-w-4xl">
+        <Logo class="justify-center" />
+
+        <div class="mt-14 border-y border-white/10 py-12 text-center sm:py-16">
+          <p class="eyebrow justify-center">Przerwa techniczna</p>
+          <h1 class="mx-auto mt-6 max-w-3xl text-4xl font-bold leading-tight text-white sm:text-6xl">
+            Paczkowo wznosi się na nowy poziom.
+          </h1>
+          <p class="mx-auto mt-6 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
+            Na chwilę wyłączamy stronę, bo budujemy nową odsłonę produktu.
+            Wracamy niedługo z wygodniejszą obsługą zamówień, wysyłek i magazynu.
+          </p>
+
+          <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <span class="border border-white/15 px-5 py-3 text-sm font-semibold text-white">
+              Trwają prace
+            </span>
+            <a
+              href={`mailto:${company.email}`}
+              class="px-5 py-3 text-sm font-semibold text-brand-300 transition hover:text-white"
+            >
+              Kontakt: {company.email}
+            </a>
+          </div>
+        </div>
+
+        <p class="mt-8 text-center text-sm leading-6 text-slate-500">
+          Dziękujemy za cierpliwość. Ta przerwa jest po to, żeby Paczkowo działało lepiej tam,
+          gdzie liczy się codzienna praca sprzedawcy.
+        </p>
+      </section>
+    </main>
   </body>
 </html>
